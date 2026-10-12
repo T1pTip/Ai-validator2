@@ -10,8 +10,15 @@ android {
         applicationId = "com.aiorigin.detector"
         minSdk = 28
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.17.0"
+        versionCode = 18
+        versionName = "0.18.0"
+    }
+    buildTypes {
+        getByName("debug") {
+            // Debug certificates cannot update release-signed installations.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
     buildFeatures { compose = true }
     compileOptions {

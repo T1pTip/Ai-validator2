@@ -2,6 +2,23 @@
 
 Target: Samsung Galaxy S23 Ultra / 12GB RAM. Native Kotlin + Compose.
 
+## Current installation status (2026-10-13)
+
+Historical QA entries below describe earlier sessions. Signed release run
+[38310829684](https://github.com/T1pTip/Ai-validator2/actions/runs/38310829684)
+successfully built, linted, verified, installed and launched v0.17 on an API 35
+x86_64 emulator. Physical S23 Ultra installation failed according to the owner;
+the exact failure is not yet captured. The product remains experimental and
+contains no trained visual AI-origin classifier.
+
+v0.18 separates debug/release package IDs, preserves the existing release signer,
+adds API 36 installation/launch checks and publishes installation evidence.
+See [S23 installation investigation](qa/S23_INSTALLATION.md) for evidence,
+safe diagnostic steps and verification limits. No Android protections are bypassed.
+
+Stage 2 has no definition in the available repository or readable imported chat.
+Its requirements must be recovered before that phase can be implemented faithfully.
+
 ## Implemented in source
 - Android picker/share import for image/video.
 - PNG textual metadata (tEXt, zTXt, iTXt), EXIF and video metadata.

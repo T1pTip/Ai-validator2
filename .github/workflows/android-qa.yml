@@ -40,6 +40,15 @@ jobs:
           echo "$HOME/.sdkman/candidates/kotlin/current/bin" >> "$GITHUB_PATH"
       - name: Test metadata components
         run: bash qa/run-jvm-tests.sh
+      - name: Validate installation helper syntax
+        run: bash -n qa/apk-evidence.sh qa/release-smoke-test.sh
+      - name: Validate Windows diagnostic helper syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/qa/device-install-diagnostics.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { $errors | Format-List; exit 1 }
       - name: Compile Android debug APK and run lint
         run: gradle --no-daemon :app:assembleDebug :app:lintDebug
       - name: Verify APK signature and record SHA-256
@@ -48,13 +57,13 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          sha256sum "$APK" | tee app/build/outputs/apk/debug/SHA256SUMS.txt
+          bash qa/apk-evidence.sh "$APK" app/build/outputs/apk/debug
+          grep -q "package: name='com.aiorigin.detector.debug'" app/build/outputs/apk/debug/apk-badging.txt
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: ai-origin-debug-apk
           path: |
             app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/debug/SHA256SUMS.txt
+            app/build/outputs/apk/debug/*.txt
           if-no-files-found: error

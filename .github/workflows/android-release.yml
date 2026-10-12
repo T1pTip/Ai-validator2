@@ -42,7 +42,7 @@ jobs:
             fi
           done
       - name: Build unsigned release
-        run: gradle --no-daemon :app:assembleRelease :app:lintRelease
+        run: gradle --no-daemon :app:assembleRelease :app:lintRelease :app:assembleDebug :app:lintDebug
       - name: Sign and verify release APK
         shell: bash
         env:
@@ -67,8 +67,9 @@ jobs:
             --out release-artifacts/ai-origin-release.apk \
             release-artifacts/app-release-aligned.apk
           rm release-artifacts/app-release-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release-artifacts/ai-origin-release.apk
-          sha256sum release-artifacts/ai-origin-release.apk > release-artifacts/SHA256SUMS.txt
+          bash qa/apk-evidence.sh release-artifacts/ai-origin-release.apk release-artifacts
+          # Preserve the existing release signer; key rotation needs a migration plan.
+          grep -q 'certificate SHA-256 digest: 45dfa607f188a6d4e8e8facc24ff07e9dc27a759081e39adffd7042fa114299b' release-artifacts/signature.txt
       - name: Enable KVM acceleration for emulator
         shell: bash
         run: |
@@ -79,7 +80,7 @@ jobs:
           fi
           sudo chmod 666 /dev/kvm
           ls -l /dev/kvm
-      - name: Check APK compatibility and install on Android emulator
+      - name: Install and launch signed APK on Android 15
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -90,11 +91,30 @@ jobs:
           emulator-boot-timeout: 900
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -no-metrics
           script: bash "$GITHUB_WORKSPACE/qa/release-smoke-test.sh"
+      - name: Install and launch signed APK on Android 16
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          target: google_apis
+          force-avd-creation: true
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -no-metrics
+          script: bash "$GITHUB_WORKSPACE/qa/release-smoke-test.sh"
       - name: Upload verified signed release
         uses: actions/upload-artifact@v4
         with:
           name: ai-origin-signed-release
           path: |
             release-artifacts/ai-origin-release.apk
-            release-artifacts/SHA256SUMS.txt
+            release-artifacts/*.txt
           if-no-files-found: error
+      - name: Preserve evidence even when emulator checks fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-origin-release-evidence
+          path: release-artifacts/*.txt
+          if-no-files-found: ignore
