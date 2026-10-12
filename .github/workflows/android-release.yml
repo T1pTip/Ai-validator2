@@ -69,6 +69,29 @@ jobs:
           rm release-artifacts/app-release-aligned.apk
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release-artifacts/ai-origin-release.apk
           sha256sum release-artifacts/ai-origin-release.apk > release-artifacts/SHA256SUMS.txt
+      - name: Check APK compatibility and install on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          target: google_apis
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            set -euo pipefail
+            APK="release-artifacts/ai-origin-release.apk"
+            "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|launchable-activity:)"
+            adb wait-for-device
+            adb shell getprop sys.boot_completed
+            adb install -r "$APK"
+            adb shell pm path com.aiorigin.detector | grep '^package:'
+            adb shell am start -W -n com.aiorigin.detector/.MainActivity
+            sleep 5
+            adb shell dumpsys activity activities | grep -E "com.aiorigin.detector|mResumedActivity|topResumedActivity"
+            if adb logcat -d -t 1000 | grep -E "FATAL EXCEPTION|Process: com.aiorigin.detector" | grep -q "com.aiorigin.detector"; then
+              echo "::error::Possible app crash detected; review emulator logcat"
+              exit 1
+            fi
       - name: Upload verified signed release
         uses: actions/upload-artifact@v4
         with:
