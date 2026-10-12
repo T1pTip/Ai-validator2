@@ -79,7 +79,10 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: |
             set -eu
-            APK="release-artifacts/ai-origin-release.apk"
+            APK="$GITHUB_WORKSPACE/release-artifacts/ai-origin-release.apk"
+            echo "Working directory: $(pwd)"
+            echo "APK location: $APK"
+            ls -lh "$APK"
             "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|launchable-activity:)"
             adb wait-for-device
             adb shell getprop sys.boot_completed
