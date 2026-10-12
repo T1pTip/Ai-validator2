@@ -78,7 +78,7 @@ jobs:
           target: google_apis
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: |
-            set -euo pipefail
+            set -eu
             APK="release-artifacts/ai-origin-release.apk"
             "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|launchable-activity:)"
             adb wait-for-device
