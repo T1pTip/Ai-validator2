@@ -43,6 +43,19 @@ $device | Set-Content (Join-Path $OutputDirectory 'device.txt')
 $installed = & $adb -s $Serial shell dumpsys package $package 2>&1
 $installed | Select-String 'versionCode=|versionName=|signatures=|Unable to find package' |
     ForEach-Object { $_.Line } | Set-Content (Join-Path $OutputDirectory 'installed-package.txt')
+# Inspect the existing base APK's real signing certificate instead of treating
+# dumpsys' internal signature hash as a certificate SHA-256 fingerprint.
+$packagePaths = & $adb -s $Serial shell pm path $package 2>&1
+$basePath = $packagePaths | Where-Object { "$_" -match '^package:/.*/base\.apk\s*$' } | Select-Object -First 1
+if ($basePath) {
+    $remoteApk = "$basePath".Trim().Substring('package:'.Length)
+    $localInstalled = Join-Path $OutputDirectory 'installed-base.apk'
+    & $adb -s $Serial pull $remoteApk $localInstalled | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect installed APK certificate; no installation attempted.' }
+    $oldSignature = & $signer verify --verbose --print-certs $localInstalled 2>&1
+    $oldSignature | Set-Content (Join-Path $OutputDirectory 'installed-signature.txt')
+    if ($LASTEXITCODE -ne 0) { throw 'Installed APK signature inspection failed; no installation attempted.' }
+}
 if ($Install) {
     # No uninstall, downgrade, signature bypass, permission grant or policy change.
     $result = & $adb -s $Serial install -r $apkPath 2>&1

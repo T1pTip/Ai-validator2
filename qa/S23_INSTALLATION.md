@@ -8,6 +8,9 @@ v1/v2 being false is not itself an error for this minSdk 28 application.
 API 35 x86_64 emulator installation returned `Success`, and the app process
 was alive eight seconds after launch. This does not test Samsung policies or a
 pre-existing installation on a physical phone.
+Downloaded APK ZIP entries passed CRC validation; it includes ARM64, ARMv7,
+x86 and x86_64 native libraries. An x86-only APK is therefore ruled out for
+this downloaded artifact; hardware execution remains untested.
 
 Downloaded APK SHA-256, independently matched to the published checksum:
 `d1c278f496097a0e670a5718c061acc1d5e091c9db95b07365fb9756d09c9866`.
@@ -27,6 +30,9 @@ Package `com.aiorigin.detector`, versionCode 17, minSdk 28, targetSdk 35.
   every previous version. Both emulators remain x86_64, not Samsung ARM64 hardware.
 - Artifacts include signer, APK manifest, checksum, commit/run and emulator
   reports. Failed emulator runs retain evidence without publishing a verified APK.
+- Release signing checks pin the v0.17 certificate fingerprint to prevent
+  accidental key changes. Intentional key rotation requires a reviewed migration
+  plan and an explicit update to that check.
 
 ## Obtain the actual device failure safely
 
@@ -47,6 +53,9 @@ It is read-only by default. Optional `-Install` makes exactly one standard
 grants permissions or changes protection settings. ADB and the phone's file
 installer can follow different policy paths; success through ADB alone does
 not establish success through Samsung's installer. Reports stay on the computer.
+If this package is installed, the helper copies only its base APK locally and
+records its actual signing certificate for comparison; it does not collect
+other apps, files, device serials in reports or global logs.
 
 | Observed failure | Follow-up |
 | --- | --- |
