@@ -69,14 +69,26 @@ jobs:
           rm release-artifacts/app-release-aligned.apk
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release-artifacts/ai-origin-release.apk
           sha256sum release-artifacts/ai-origin-release.apk > release-artifacts/SHA256SUMS.txt
+      - name: Enable KVM acceleration for emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::KVM is unavailable on this runner"
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
       - name: Check APK compatibility and install on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          target: google_apis
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          target: default
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -no-metrics
           script: bash "$GITHUB_WORKSPACE/qa/release-smoke-test.sh"
       - name: Upload verified signed release
         uses: actions/upload-artifact@v4
