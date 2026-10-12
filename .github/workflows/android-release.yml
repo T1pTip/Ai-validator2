@@ -77,24 +77,7 @@ jobs:
           profile: pixel_6
           target: google_apis
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
-          script: |
-            set -eu
-            APK="$GITHUB_WORKSPACE/release-artifacts/ai-origin-release.apk"
-            echo "Working directory: $(pwd)"
-            echo "APK location: $APK"
-            ls -lh "$APK"
-            "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|launchable-activity:)"
-            adb wait-for-device
-            adb shell getprop sys.boot_completed
-            adb install -r "$APK"
-            adb shell pm path com.aiorigin.detector | grep '^package:'
-            adb shell am start -W -n com.aiorigin.detector/.MainActivity
-            sleep 5
-            adb shell dumpsys activity activities | grep -E "com.aiorigin.detector|mResumedActivity|topResumedActivity"
-            if adb logcat -d -t 1000 | grep -E "FATAL EXCEPTION|Process: com.aiorigin.detector" | grep -q "com.aiorigin.detector"; then
-              echo "::error::Possible app crash detected; review emulator logcat"
-              exit 1
-            fi
+          script: bash "$GITHUB_WORKSPACE/qa/release-smoke-test.sh"
       - name: Upload verified signed release
         uses: actions/upload-artifact@v4
         with:
