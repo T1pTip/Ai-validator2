@@ -42,9 +42,19 @@ jobs:
         run: bash qa/run-jvm-tests.sh
       - name: Compile Android debug APK and run lint
         run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+      - name: Verify APK signature and record SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          sha256sum "$APK" | tee app/build/outputs/apk/debug/SHA256SUMS.txt
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: ai-origin-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
           if-no-files-found: error
