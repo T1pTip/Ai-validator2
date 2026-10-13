@@ -19,8 +19,8 @@ android {
         applicationId = "com.aiorigin.detector"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.20.0"
+        versionCode = 21
+        versionName = "0.21.0"
     }
     signingConfigs {
         // Fixed, intentionally public debug key (standard Android debug credentials). Without it,

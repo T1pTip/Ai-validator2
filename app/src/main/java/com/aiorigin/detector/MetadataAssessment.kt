@@ -41,6 +41,14 @@ object MetadataAssessor {
         "chatgpt", "openai", "firefly", "imagen", "gemini", "flux", "bing image creator", "microsoft designer",
         "meta ai", "grok", "kling", "runway", "sora", "veo", "pika", "luma"
     )
+    private const val MAX_TOOL_SEARCH = 200_000
+    private val wordPatterns = HashMap<String, Regex>()
+    /** "luma" must not match "LumaFusion", nor "imagen" "Imagenomic"; a version may follow ("SDXL1.0"). */
+    private fun wholeWord(name: String): Regex = synchronized(wordPatterns) {
+        wordPatterns.getOrPut(name) {
+            Regex("(?<![\\p{L}\\p{N}])" + Regex.escape(name) + "(?!\\p{L})", RegexOption.IGNORE_CASE)
+        }
+    }
     private val softwareKeyParts = listOf("software", "c2pa.generator", "creatortool", "processingsoftware")
     private val explicitPromptKeys = listOf("positive_prompt", "positive prompt", "parameters", "generation_data", "prompt", "negative_prompt", "negative prompt")
     private val weakKeys = setOf("description", "comment", "imagedescription", "usercomment")
@@ -67,10 +75,13 @@ object MetadataAssessor {
         val indicators = mutableListOf<String>()
         val software = metadata.entries.firstOrNull { it.key.contains("software", true) }?.value
         val softwareValues = metadata.entries.filter { (k, _) -> softwareKeyParts.any { k.contains(it, true) } }.map { it.value }
-        val tool = metadata.values.firstNotNullOfOrNull { value ->
-            generationTools.firstOrNull { value.contains(it, ignoreCase = true) }
+        // Raw XMP packets carry base64 thumbnails and unrelated namespaces; their fields are
+        // searched after extraction instead, so random text cannot produce a tool match.
+        val searchable = metadata.values.filterNot { XmpFields.looksLikeXmp(it) }
+        val tool = searchable.firstNotNullOfOrNull { value ->
+            generationTools.firstOrNull { wholeWord(it).containsMatchIn(value.take(MAX_TOOL_SEARCH)) }
         } ?: softwareValues.firstNotNullOfOrNull { value ->
-            softwareOnlyTools.firstOrNull { value.contains(it, ignoreCase = true) }
+            softwareOnlyTools.firstOrNull { wholeWord(it).containsMatchIn(value.take(MAX_TOOL_SEARCH)) }
         } ?: if (metadata.values.any(::isComfyGraph)) "ComfyUI" else null
         val c2paPresent = metadata["c2pa.present"] == "true"
         val c2paGenerator = metadata["c2pa.generator"]

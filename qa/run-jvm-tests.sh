@@ -11,7 +11,7 @@ run() {
   java -jar "$TMPDIR_QA/$name.jar"
 }
 run png "$SRC/PngMetadataReader.kt" "$SRC/C2paSniffer.kt" qa/PngReaderQa.kt
-run assessment "$SRC/MetadataAssessment.kt" "$SRC/GenerationParameters.kt" qa/MetadataAssessmentQa.kt
+run assessment "$SRC/MetadataAssessment.kt" "$SRC/GenerationParameters.kt" "$SRC/XmpFields.kt" qa/MetadataAssessmentQa.kt
 run fingerprint "$SRC/MediaFingerprint.kt" qa/MediaFingerprintQa.kt
 run parameters "$SRC/GenerationParameters.kt" qa/GenerationParametersQa.kt
 run jpeg "$SRC/JpegMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" qa/JpegMetadataQa.kt
@@ -19,4 +19,5 @@ run webp "$SRC/WebpMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" 
 run prompt-fields "$SRC/GenerationParameters.kt" "$SRC/PromptFields.kt" qa/PromptFieldsQa.kt
 run report "$SRC/ScanReport.kt" qa/ScanResultStub.kt qa/ScanReportQa.kt
 run url "$SRC/UrlFetcher.kt" "$SRC/XmpFields.kt" qa/UrlFetcherQa.kt
+run exif-text "$SRC/ExifText.kt" qa/ExifTextQa.kt
 echo 'ALL JVM SUITES PASSED'

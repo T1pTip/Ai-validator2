@@ -47,4 +47,18 @@ fun main() {
     checkCase("ordinary JSON is not ComfyUI", mapOf("comment" to """{"class_type":"photo"}"""), "Description found; origin unknown")
     check(MetadataAssessor.description(mapOf("ImageDescription" to " a red fox ")) == "a red fox"); println("PASS: description shown")
     check(MetadataAssessor.description(mapOf("UserComment" to "x\nSteps: 20, Seed: 1")) == null); println("PASS: A1111 text is not a description")
+    // Adversarial review regressions: substring and base64 false positives.
+    checkCase("Imagenomic is not Imagen", mapOf("Software" to "Imagenomic Portraiture 3"), "Origin unknown")
+    checkCase("LumaFusion is not Luma", mapOf("Software" to "LumaFusion 4.1"), "Origin unknown")
+    checkCase("SDXL with version still matches", mapOf("Software" to "SDXL1.0 base"), "AI creation metadata found (unverified)")
+    val rnd = java.util.Random(7)
+    val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    var falseHits = 0
+    repeat(200) {
+        val b64 = buildString { repeat(45_000) { append(alphabet[rnd.nextInt(64)]) } } + "sdxl" // worst case: present in raw XMP
+        val xmp = """<x:xmpmeta><rdf:RDF><rdf:Description xmp:CreatorTool="Adobe Photoshop 25.0"><xmpGImg:image>$b64</xmpGImg:image></rdf:Description></rdf:RDF></x:xmpmeta>"""
+        if (MetadataAssessor.assess(mapOf("xmp" to xmp, "creatortool" to "Adobe Photoshop 25.0")).tool != null) falseHits++
+    }
+    check(falseHits == 0) { "base64 thumbnail produced $falseHits tool matches" }
+    println("PASS: base64 thumbnails in raw XMP never produce a tool match")
 }

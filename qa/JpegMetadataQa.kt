@@ -47,4 +47,19 @@ fun main() {
     test("C2PA claim generator") { c2pa["c2pa.generator"] == "ChatGPT" }
     test("APP11 without c2pa ignored") { parse(jpeg(0xeb to "JPxxxx".toByteArray())).isEmpty() }
     println("$passed/18 JPEG tests passed")
+    test("XMP with 400 KB of unclosed tags finishes quickly") {
+        val evil = "<x:xmpmeta>" + "<prompt>".repeat(50_000) + "prompt=\"".repeat(10_000)
+        val t0 = System.nanoTime(); XmpFields.extract(evil); (System.nanoTime() - t0) < 3_000_000_000L
+    }
+    test("XMP fields still extracted after rewrite") {
+        val f = XmpFields.extract("""<x:xmpmeta><rdf:Description xmp:CreatorTool="Tool's A" dc:x='y'><dc:description><rdf:Alt><rdf:li xml:lang="x-default">a red &amp; fox</rdf:li></rdf:Alt></dc:description><sd:prompt>an artist's studio</sd:prompt></rdf:Description></x:xmpmeta>""")
+        f["creatortool"] == "Tool's A" && f["description"] == "a red & fox" && f["prompt"] == "an artist's studio"
+    }
+    test("crafted C2PA CBOR scan is fast") {
+        val body = ByteArray(3_000_000) { k -> when (k % 3) { 0 -> 0x79.toByte(); else -> 0xFF.toByte() } }
+        val cont = ByteArray(1_000_000) { k -> if (k % 200 == 0) 0x78.toByte() else if (k % 200 == 1) 120.toByte() else if (k % 200 == 150) 0x80.toByte() else 'a'.code.toByte() }
+        val t0 = System.nanoTime()
+        C2paSniffer.inspect("c2pa".toByteArray() + body + cont)
+        (System.nanoTime() - t0) < 3_000_000_000L
+    }
 }

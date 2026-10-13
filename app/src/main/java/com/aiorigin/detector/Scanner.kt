@@ -31,8 +31,11 @@ data class ScanResult(
 object Scanner {
     private class MetadataOutcome(val metadata: Map<String, String>, val evidence: List<String>, val readFailed: Boolean = false)
 
-    suspend fun scan(context: Context, uri: Uri, sourceEvidence: List<String> = emptyList()): ScanResult = coroutineScope {
-        val type = context.contentResolver.getType(uri) ?: ""
+    /** [typeHint] is the server's Content-Type for downloaded files, since file:// URIs carry no type. */
+    suspend fun scan(
+        context: Context, uri: Uri, sourceEvidence: List<String> = emptyList(), typeHint: String? = null
+    ): ScanResult = coroutineScope {
+        val type = context.contentResolver.getType(uri) ?: typeHint?.lowercase() ?: ""
         val header = runInterruptible(Dispatchers.IO) { readHeader(context, uri, 16) }
         val isVideo = type.startsWith("video/") || (!type.startsWith("image/") && isVideoContainer(header))
 
@@ -143,6 +146,9 @@ object Scanner {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 try {
                     val exif = ExifInterface(input)
+                    // UserComment carries its own character code (A1111 writes UTF-16); decode it from raw bytes.
+                    ExifText.userComment(exif.getAttributeBytes(ExifInterface.TAG_USER_COMMENT))
+                        ?.let { metadata.putIfAbsent(ExifInterface.TAG_USER_COMMENT, it.take(200_000)) }
                     for (tag in listOf(ExifInterface.TAG_IMAGE_DESCRIPTION, ExifInterface.TAG_SOFTWARE,
                         ExifInterface.TAG_USER_COMMENT, ExifInterface.TAG_ARTIST)) {
                         exif.getAttribute(tag)?.trim('\u0000', ' ')?.takeIf { it.isNotBlank() }
@@ -211,6 +217,9 @@ object Scanner {
 
     /** ISO-BMFF "ftyp" box that is not an image brand (HEIC/AVIF also use ftyp). */
     private fun isVideoContainer(header: ByteArray): Boolean {
+        // Matroska / WebM start with the EBML magic number.
+        if (header.size >= 4 && header[0] == 0x1a.toByte() && header[1] == 0x45.toByte() &&
+            header[2] == 0xdf.toByte() && header[3] == 0xa3.toByte()) return true
         if (header.size < 12 || String(header, 4, 4, Charsets.US_ASCII) != "ftyp") return false
         val brand = String(header, 8, 4, Charsets.US_ASCII).lowercase()
         return brand !in setOf("heic", "heix", "heim", "heis", "mif1", "msf1", "avif", "avis")
