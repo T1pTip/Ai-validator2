@@ -29,7 +29,7 @@ data class ScanResult(
  * video frame sampling) and merges them into one result. Nothing leaves the device.
  */
 object Scanner {
-    private class MetadataOutcome(val metadata: Map<String, String>, val evidence: List<String>)
+    private class MetadataOutcome(val metadata: Map<String, String>, val evidence: List<String>, val readFailed: Boolean = false)
 
     suspend fun scan(context: Context, uri: Uri, sourceEvidence: List<String> = emptyList()): ScanResult = coroutineScope {
         val type = context.contentResolver.getType(uri) ?: ""
@@ -47,10 +47,13 @@ object Scanner {
         val meta = metadata.await()
         evidence.addAll(meta.evidence)
         frames?.let { evidence.addAll(it.await()) }
-        build(context, meta.metadata, evidence, isVideo)
+        build(context, meta.metadata, evidence, isVideo, meta.readFailed)
     }
 
-    private fun build(context: Context, metadata: Map<String, String>, evidence: MutableList<String>, isVideo: Boolean): ScanResult {
+    private fun build(
+        context: Context, metadata: Map<String, String>, evidence: MutableList<String>,
+        isVideo: Boolean, readFailed: Boolean
+    ): ScanResult {
         val assessment = MetadataAssessor.assess(metadata)
         if (assessment.level == OriginLevel.AI_DECLARED) evidence.add(context.getString(R.string.e_declared))
         if (assessment.level == OriginLevel.AI_EDITED) evidence.add(context.getString(R.string.e_declared_edit))
@@ -70,7 +73,9 @@ object Scanner {
             OriginLevel.AI_TOOL -> R.string.v_ai_tool to R.string.x_tool
             OriginLevel.PROMPT -> R.string.v_prompt to R.string.x_prompt
             OriginLevel.DESCRIPTION -> R.string.v_description to R.string.x_description
-            OriginLevel.UNKNOWN -> R.string.v_unknown to R.string.x_unknown
+            // Nothing was found because the file could not be opened: say so instead of "no signs found".
+            OriginLevel.UNKNOWN -> if (readFailed) R.string.v_unreadable to R.string.x_unreadable
+                else R.string.v_unknown to R.string.x_unknown
         }
         val source = context.getString(
             when (fields.originKind) {
@@ -112,8 +117,11 @@ object Scanner {
     private fun imageMetadata(context: Context, uri: Uri, header: ByteArray): MetadataOutcome {
         val metadata = linkedMapOf<String, String>()
         val evidence = mutableListOf<String>()
+        var readFailed = false
         try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            val opened = context.contentResolver.openInputStream(uri)
+            if (opened == null) readFailed = true
+            opened?.use { input ->
                 when {
                     header.size >= 8 && header.copyOf(8).contentEquals(PNG_SIGNATURE) -> {
                         metadata.putAll(PngMetadataReader.read(input)); evidence.add(context.getString(R.string.e_png))
@@ -147,15 +155,17 @@ object Scanner {
                 } catch (_: Exception) { }
             }
         } catch (e: Exception) {
+            readFailed = true
             evidence.add(context.getString(R.string.e_meta_failed, e.javaClass.simpleName))
         }
-        return MetadataOutcome(metadata, evidence)
+        return MetadataOutcome(metadata, evidence, readFailed)
     }
 
     private fun videoMetadata(context: Context, uri: Uri): MetadataOutcome {
         val metadata = linkedMapOf<String, String>()
         val evidence = mutableListOf<String>()
         val retriever = MediaMetadataRetriever()
+        var readFailed = false
         try {
             retriever.setDataSource(context, uri)
             val keys = mapOf(
@@ -168,11 +178,12 @@ object Scanner {
             }
             evidence.add(context.getString(R.string.e_video_meta))
         } catch (e: Exception) {
+            readFailed = true
             evidence.add(context.getString(R.string.e_meta_failed, e.javaClass.simpleName))
         } finally {
             retriever.release()
         }
-        return MetadataOutcome(metadata, evidence)
+        return MetadataOutcome(metadata, evidence, readFailed)
     }
 
     private fun videoFrames(context: Context, uri: Uri): List<String> = try {
