@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">גלאי מקור AI</string>
+    <string name="app_title">גלאי מקור AI</string>
+    <string name="subtitle">סריקה מקומית בטלפון · בלי העלאה לענן</string>
+    <string name="device_line">%1$s · זיכרון פנוי %2$s מתוך %3$s GB · %4$d ליבות · חום: %5$s</string>
+    <string name="mode_line">מצב עיבוד מומלץ: %1$s</string>
+    <string name="mode_performance">ביצועים</string>
+    <string name="mode_balanced">מאוזן</string>
+    <string name="mode_conservative">חסכוני</string>
+    <string name="choose">בחר תמונה או סרטון</string>
+    <string name="scanning">סורק…</string>
+    <string name="cancel">ביטול</string>
+    <string name="scan_failed">הסריקה נכשלה: %1$s</string>
+    <string name="scan_cancelled">הסריקה בוטלה</string>
+
+    <string name="v_ai_declared">הקובץ מצהיר שנוצר ב-AI</string>
+    <string name="v_ai_edited">הקובץ מצהיר שנערך ב-AI</string>
+    <string name="v_ai_tool">נמצאו בקובץ סימני יצירה ב-AI</string>
+    <string name="v_prompt">נמצא בקובץ טקסט שנראה כמו פרומפט</string>
+    <string name="v_description">נמצא תיאור בלבד, המקור לא ידוע</string>
+    <string name="v_unknown">לא נמצאו סימנים בקובץ, המקור לא ידוע</string>
+    <string name="x_declared">המטא-דאטה של הקובץ (C2PA או IPTC) מסמנת אותו כתוכן שנוצר במודל AI. החתימה עדיין לא מאומתת, ולכן זו עדות חזקה אבל לא הוכחה.</string>
+    <string name="x_edited">המטא-דאטה מסמנת עריכה או הרכבה בעזרת מודל AI. החתימה עדיין לא מאומתת.</string>
+    <string name="x_tool">נמצאו שם של כלי יצירה או הגדרות יצירה. נתונים כאלה אפשר לערוך ידנית, ולכן הם לא הוכחה.</string>
+    <string name="x_prompt">יש בקובץ שדה פרומפט, אבל בלי שם כלי או הצהרה. ייתכן שהתמונה נוצרה ב-AI.</string>
+    <string name="x_description">יש בקובץ תיאור טקסטואלי, אבל אין בו סימן ליצירה ב-AI.</string>
+    <string name="x_unknown">רוב האתרים והאפליקציות מוחקים מטא-דאטה, ולכן היעדר סימנים לא מוכיח שהתמונה אמיתית. בדיקה חזותית תתווסף בשלב הבא.</string>
+
+    <string name="s_prompt">פרומפט שנמצא בקובץ</string>
+    <string name="s_negative">פרומפט שלילי</string>
+    <string name="s_settings">הגדרות יצירה</string>
+    <string name="s_evidence">ראיות</string>
+    <string name="s_limits">מגבלות</string>
+    <string name="s_source">מקור הפרומפט: %1$s</string>
+    <string name="copy_prompt">העתק פרומפט</string>
+    <string name="copy_negative">העתק פרומפט שלילי</string>
+    <string name="copied">הועתק</string>
+    <string name="share">שתף דוח</string>
+    <string name="share_chooser">שיתוף דוח סריקה</string>
+
+    <string name="o_explicit">שדה פרומפט מסומן במטא-דאטה (לא מאומת)</string>
+    <string name="o_settings">הגדרות יצירה במטא-דאטה (לא מאומת)</string>
+    <string name="o_field">שדה פרומפט במטא-דאטה (לא מאומת)</string>
+    <string name="o_none">לא נמצא פרומפט מקורי</string>
+    <string name="caveat">הגרסה הזו בודקת רק נתונים שמוטמעים בקובץ. היא עדיין לא מבצעת זיהוי חזותי, אימות חתימת C2PA, חיפוש ברשת או שחזור פרומפט. מטא-דאטה אפשר לערוך או למחוק, ותיאור אינו הוכחה לפרומפט מקורי.</string>
+
+    <string name="e_fingerprint">טביעת אצבע SHA-256: %1$s</string>
+    <string name="e_fingerprint_skipped">טביעת האצבע דולגה (קובץ מעל 1GB, או שהסריקה בוטלה)</string>
+    <string name="e_fingerprint_failed">לא ניתן לחשב טביעת אצבע</string>
+    <string name="e_png">נבדקו שדות הטקסט וה-C2PA של PNG</string>
+    <string name="e_webp">נבדקו ה-XMP וה-C2PA של WebP</string>
+    <string name="e_jpeg">נבדקו ההערות, ה-XMP וה-C2PA של JPEG</string>
+    <string name="e_exif">נבדקו שדות EXIF</string>
+    <string name="e_camera">פרטי מצלמה בקובץ: %1$s (ניתן לעריכה)</string>
+    <string name="e_video_meta">נבדק המטא-דאטה של הסרטון</string>
+    <string name="e_video_summary">סרטון: %1$dx%2$d, %3$d שניות</string>
+    <string name="e_video_frames">נדגמו %1$d פריימים, %2$d שינויי סצנה (זה לא זיהוי AI)</string>
+    <string name="e_video_failed">דגימת הפריימים נכשלה: %1$s</string>
+    <string name="e_meta_failed">קריאת המטא-דאטה נכשלה: %1$s</string>
+    <string name="e_unsupported">סוג קובץ שלא נתמך לקריאת מטא-דאטה: %1$s</string>
+    <string name="e_declared">המטא-דאטה מצהירה שהתוכן נוצר על ידי מודל AI (trainedAlgorithmicMedia)</string>
+    <string name="e_declared_edit">המטא-דאטה מצהירה שהתוכן נערך בעזרת מודל AI</string>
+    <string name="e_c2pa">נמצא מניפסט C2PA (Content Credentials). החתימה לא אומתה.</string>
+    <string name="e_c2pa_gen">היוצר לפי C2PA: %1$s</string>
+    <string name="e_tool">שם של כלי יצירה במטא-דאטה: %1$s</string>
+    <string name="e_settings">נמצאו הגדרות יצירה בסגנון AUTOMATIC1111</string>
+    <string name="e_software">שדה תוכנה: %1$s</string>
+    <string name="e_negative_len">נמצא פרומפט שלילי נפרד (%1$d תווים)</string>
+
+    <string name="r_title">גלאי מקור AI · דוח סריקה מקומי</string>
+    <string name="r_status">תוצאה</string>
+    <string name="r_source">מקור הפרומפט</string>
+    <string name="r_positive">פרומפט (לא מאומת)</string>
+    <string name="r_negative">פרומפט שלילי (לא מאומת)</string>
+    <string name="r_not_found">לא נמצא</string>
+</resources>

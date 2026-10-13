@@ -10,12 +10,12 @@ run() {
   kotlinc "$@" -include-runtime -d "$TMPDIR_QA/$name.jar"
   java -jar "$TMPDIR_QA/$name.jar"
 }
-run png "$SRC/PngMetadataReader.kt" qa/PngReaderQa.kt
-run assessment "$SRC/MetadataAssessment.kt" qa/MetadataAssessmentQa.kt
+run png "$SRC/PngMetadataReader.kt" "$SRC/C2paSniffer.kt" qa/PngReaderQa.kt
+run assessment "$SRC/MetadataAssessment.kt" "$SRC/GenerationParameters.kt" qa/MetadataAssessmentQa.kt
 run fingerprint "$SRC/MediaFingerprint.kt" qa/MediaFingerprintQa.kt
 run parameters "$SRC/GenerationParameters.kt" qa/GenerationParametersQa.kt
-run jpeg "$SRC/JpegMetadataReader.kt" qa/JpegMetadataQa.kt
-run webp "$SRC/WebpMetadataReader.kt" qa/WebpMetadataQa.kt
+run jpeg "$SRC/JpegMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" qa/JpegMetadataQa.kt
+run webp "$SRC/WebpMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" qa/WebpMetadataQa.kt
 run prompt-fields "$SRC/GenerationParameters.kt" "$SRC/PromptFields.kt" qa/PromptFieldsQa.kt
 run report "$SRC/ScanReport.kt" qa/ScanResultStub.kt qa/ScanReportQa.kt
 echo 'ALL JVM SUITES PASSED'

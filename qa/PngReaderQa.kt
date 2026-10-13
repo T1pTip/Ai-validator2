@@ -42,4 +42,10 @@ fun main() {
     verify(PngMetadataReader.read(ByteArrayInputStream(png(bomb))).isEmpty(), "decompression bomb cap")
     val invalid = byteArrayOf(137.toByte(),80,78,71,13,10,26,10) + byteArrayOf(0x7f,0x7f,0x7f,0x7f)
     verify(PngMetadataReader.read(ByteArrayInputStream(invalid)).isEmpty(), "oversized chunk rejected")
+    val bigIdat = chunk("IDAT", ByteArray(9_000_000) { 7 })
+    val afterImage = PngMetadataReader.read(ByteArrayInputStream(png(bigIdat, plain)))
+    verify(afterImage["parameters"] == "sunset landscape", "text chunk after 9 MB IDAT is found")
+    val cabx = chunk("caBX", "jumb c2pa compositeWithTrainedAlgorithmicMedia".toByteArray())
+    val c = PngMetadataReader.read(ByteArrayInputStream(png(cabx)))
+    verify(c["c2pa.present"] == "true" && c["c2pa.digital_source_type"] == "compositeWithTrainedAlgorithmicMedia", "caBX C2PA edit declaration")
 }

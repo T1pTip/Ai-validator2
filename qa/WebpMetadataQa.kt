@@ -28,5 +28,10 @@ fun main() {
     checkCase("malformed chunk length", parse("RIFF".toByteArray() + intLE(20) + "WEBP".toByteArray() + "XMP ".toByteArray() + intLE(Int.MAX_VALUE)).isEmpty())
     checkCase("unicode", parse(webp(chunk("XMP ", "שלום 🎨".toByteArray())))["xmp"] == "שלום 🎨")
     checkCase("unrelated chunk", parse(webp(chunk("VP8 ", byteArrayOf(1,2,3,4)))).isEmpty())
-    println("$passed/10 WebP QA passed")
+    val promptXmp = "<x:xmpmeta><rdf:Description sd:prompt=\"a lighthouse at dusk\" sd:negative_prompt='blurry'/></x:xmpmeta>"
+    val parsed = parse(webp(chunk("VP8 ", byteArrayOf(1,2,3)), chunk("XMP ", promptXmp.toByteArray())))
+    checkCase("XMP prompt extracted as a field", parsed["prompt"] == "a lighthouse at dusk")
+    checkCase("XMP negative prompt extracted", parsed["negative_prompt"] == "blurry")
+    checkCase("C2PA chunk", parse(webp(chunk("C2PA", "jumb c2pa trainedAlgorithmicMedia".toByteArray())))["c2pa.present"] == "true")
+    println("$passed/13 WebP QA passed")
 }

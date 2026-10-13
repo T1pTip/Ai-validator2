@@ -10,32 +10,41 @@ import java.io.ByteArrayOutputStream
 
 /**
  * Defensive PNG text reader. Verifies per-chunk CRC, bounds chunk size and inflated output.
- * No Android dependencies: can be tested with the Kotlin CLI.
+ * Image data chunks are skipped without buffering, so text chunks written after large
+ * IDAT data are still found. No Android dependencies: can be tested with the Kotlin CLI.
  */
 object PngMetadataReader {
     private const val MAX_CHUNK = 2_000_000
-    private const val MAX_TOTAL = 8_000_000
+    private const val MAX_TOTAL = 512L * 1024 * 1024
     private const val MAX_TEXT = 200_000
     private val signature = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
+    private val readTypes = setOf("tEXt", "zTXt", "iTXt", "caBX")
 
     fun read(stream: InputStream): Map<String, String> {
         val found = linkedMapOf<String, String>()
         if (readExactly(stream, 8)?.contentEquals(signature) != true) return found
-        var total = 8
+        var total = 8L
         while (total < MAX_TOTAL) {
             val lengthBytes = readExactly(stream, 4) ?: break
             val length = ByteBuffer.wrap(lengthBytes).order(ByteOrder.BIG_ENDIAN).int
-            if (length < 0 || length > MAX_CHUNK || length.toLong() + total + 12 > MAX_TOTAL) break
+            if (length < 0 || length.toLong() + total + 12 > MAX_TOTAL) break
             val typeBytes = readExactly(stream, 4) ?: break
             val type = String(typeBytes, Charsets.US_ASCII)
+            total += length.toLong() + 12
+            if (type == "IEND") break
+            if (type !in readTypes || length > MAX_CHUNK) {
+                if (!skipExactly(stream, length.toLong() + 4)) break
+                continue
+            }
             val payload = readExactly(stream, length) ?: break
             val crcBytes = readExactly(stream, 4) ?: break
-            total += length + 12
             val crc = CRC32().apply { update(typeBytes); update(payload) }.value
             val expected = ByteBuffer.wrap(crcBytes).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xffffffffL
             if (crc != expected) continue
-            if (type == "IEND") break
-            if (type !in setOf("tEXt", "zTXt", "iTXt")) continue
+            if (type == "caBX") {
+                C2paSniffer.inspect(payload)?.let { found.putAll(C2paSniffer.toMetadata(it)) }
+                continue
+            }
             val zero = payload.indexOf(0)
             if (zero !in 1..79) continue
             val key = String(payload, 0, zero, Charsets.ISO_8859_1)
@@ -92,5 +101,17 @@ object PngMetadataReader {
             offset += n
         }
         return bytes
+    }
+
+    private fun skipExactly(stream: InputStream, amount: Long): Boolean {
+        var left = amount
+        val buffer = ByteArray(8192)
+        while (left > 0) {
+            if (Thread.currentThread().isInterrupted) return false
+            val n = stream.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
+            if (n <= 0) return false
+            left -= n
+        }
+        return true
     }
 }

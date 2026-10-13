@@ -5,130 +5,218 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
+
+private val DarkColors = darkColorScheme(
+    primary = Color(0xFF8AB4F8),
+    onPrimary = Color(0xFF0B1A33),
+    primaryContainer = Color(0xFF1E3A5F),
+    onPrimaryContainer = Color(0xFFD6E4FF),
+    secondary = Color(0xFFB0BEC5),
+    background = Color(0xFF0E1116),
+    onBackground = Color(0xFFE6EDF3),
+    surface = Color(0xFF161B22),
+    onSurface = Color(0xFFE6EDF3),
+    surfaceVariant = Color(0xFF21262D),
+    onSurfaceVariant = Color(0xFFB7C0CA),
+    outline = Color(0xFF30363D),
+    error = Color(0xFFFFB4A9)
+)
+private val SignalContainer = Color(0xFF3A2E12)
+private val OnSignal = Color(0xFFF2C46B)
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: ScanViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
-        val initialUri = if (intent?.action == Intent.ACTION_SEND) {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-        } else null
+        // Only the first creation handles a share intent; rotation must not rescan.
+        if (savedInstanceState == null) sharedUri(intent)?.let { viewModel.scan(it) }
         setContent {
-            MaterialTheme {
-                var result by remember { mutableStateOf<ScanResult?>(null) }
-                var busy by remember { mutableStateOf(false) }
-                var notice by remember { mutableStateOf<String?>(null) }
-                val scope = rememberCoroutineScope()
-                var scanJob by remember { mutableStateOf<Job?>(null) }
-                var noticeJob by remember { mutableStateOf<Job?>(null) }
-                var scanGeneration by remember { mutableIntStateOf(0) }
-                val profile = remember { DeviceProfiler.inspect(this@MainActivity) }
-                fun process(uri: Uri) {
-                    scanGeneration += 1
-                    val generation = scanGeneration
-                    scanJob?.cancel()
-                    noticeJob?.cancel()
-                    notice = null
-                    result = null
-                    scanJob = scope.launch {
-                        busy = true
-                        try {
-                            val scanned = withContext(Dispatchers.IO) { Scanner.scan(this@MainActivity, uri) }
-                            if (generation != scanGeneration) return@launch
-                            result = scanned
-                            notice = scanned.status
-                            noticeJob = scope.launch {
-                                delay(10_000)
-                                if (generation == scanGeneration) notice = null
-                            }
-                        } catch (_: CancellationException) {
-                            // Superseded scan: do not show stale results.
-                        } catch (e: Exception) {
-                            if (generation == scanGeneration) notice = "Scan failed: ${e.javaClass.simpleName}"
-                        } finally {
-                            if (generation == scanGeneration) busy = false
-                        }
-                    }
-                }
-                val picker = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
-                ) { uri -> if (uri != null) process(uri) }
-                LaunchedEffect(initialUri) { if (initialUri != null) process(initialUri) }
-                Scaffold { pad ->
-                    Column(
-                        Modifier.padding(pad).padding(20.dp).fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text("AI Origin Detector", style = MaterialTheme.typography.headlineMedium)
-                        Text("Local metadata prototype • No paid APIs • No uploads")
-                        Text("Device: ${profile.device}")
-                        Text("Physical RAM: ${String.format(Locale.US, "%.1f", profile.physicalRamGb)} GB; available: ${String.format(Locale.US, "%.1f", profile.availableRamGb)} GB")
-                        Text("CPU cores: ${profile.cpuCores}; thermal: ${profile.thermalStatus}")
-                        Text("Recommended processing mode: ${profile.recommendedMode}")
-                        Button(onClick = { picker.launch(arrayOf("image/*", "video/*")) }) {
-                            Text("Choose image or video")
-                        }
-                        if (busy) CircularProgressIndicator()
-                        if (notice != null) {
-                            Surface(color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = MaterialTheme.shapes.medium) {
-                                Text(notice!!, Modifier.padding(16.dp))
-                            }
-                        }
-                        result?.let { r ->
-                            Text(r.status, style = MaterialTheme.typography.titleLarge)
-                            Text("Evidence", style = MaterialTheme.typography.titleMedium)
-                            r.evidence.forEach { Text("• $it") }
-                            Text("Prompt source: ${r.source}")
-                            if (r.prompt != null) {
-                                Text("Positive prompt / extracted text", style = MaterialTheme.typography.titleMedium)
-                                Text(r.prompt)
-                                Button(onClick = {
-                                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(ClipData.newPlainText("Prompt", r.prompt))
-                                }) { Text("Copy extracted text") }
-                            }
-                            if (r.negativePrompt != null) {
-                                Text("Negative prompt", style = MaterialTheme.typography.titleMedium)
-                                Text(r.negativePrompt)
-                                Button(onClick = {
-                                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(ClipData.newPlainText("Negative prompt", r.negativePrompt))
-                                }) { Text("Copy negative prompt") }
-                            }
-                            Button(onClick = {
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, ScanReport.format(r))
-                                }
-                                startActivity(Intent.createChooser(send, "Share scan report"))
-                            }) { Text("Share text report") }
-                            HorizontalDivider()
-                            Text(r.caveat, color = MaterialTheme.colorScheme.error)
-                        }
-                    }
+            MaterialTheme(colorScheme = DarkColors) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    AppScreen(viewModel)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        sharedUri(intent)?.let { viewModel.scan(it) }
+    }
+
+    private fun sharedUri(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_SEND) return null
+        return if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
+    }
+}
+
+@Composable
+private fun AppScreen(viewModel: ScanViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val state by viewModel.state.collectAsState()
+    val profile = remember { DeviceProfiler.inspect(context) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.scan(uri)
+    }
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { pad ->
+        Column(
+            Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(stringResource(R.string.app_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DeviceCard(profile)
+            Button(
+                onClick = { picker.launch(arrayOf("image/*", "video/*")) },
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+            ) { Text(stringResource(R.string.choose), style = MaterialTheme.typography.titleMedium) }
+            if (state.busy) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+                    Text(stringResource(R.string.scanning), Modifier.weight(1f))
+                    OutlinedButton(onClick = viewModel::cancel) { Text(stringResource(R.string.cancel)) }
+                }
+            }
+            state.notice?.let { notice ->
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.medium,
+                    onClick = viewModel::dismissNotice) {
+                    Text(notice, Modifier.fillMaxWidth().padding(14.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+            state.result?.let { ResultView(it) }
+        }
+    }
+}
+
+@Composable
+private fun DeviceCard(profile: DeviceProfile) {
+    val mode = stringResource(
+        when (profile.recommendedMode) {
+            "Performance" -> R.string.mode_performance
+            "Conservative" -> R.string.mode_conservative
+            else -> R.string.mode_balanced
+        }
+    )
+    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(
+                    R.string.device_line, profile.device,
+                    String.format(Locale.US, "%.1f", profile.availableRamGb),
+                    String.format(Locale.US, "%.1f", profile.physicalRamGb),
+                    profile.cpuCores, profile.thermalStatus
+                ),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(stringResource(R.string.mode_line, mode), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ResultView(r: ScanResult) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val signal = r.level in setOf(OriginLevel.AI_DECLARED, OriginLevel.AI_EDITED, OriginLevel.AI_TOOL, OriginLevel.PROMPT)
+    Surface(
+        color = if (signal) SignalContainer else MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(r.status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                color = if (signal) OnSignal else MaterialTheme.colorScheme.onSurface)
+            Text(r.explanation, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+    r.prompt?.let { PromptCard(stringResource(R.string.s_prompt), it, stringResource(R.string.copy_prompt), context) }
+    r.negativePrompt?.let { PromptCard(stringResource(R.string.s_negative), it, stringResource(R.string.copy_negative), context) }
+    Text(stringResource(R.string.s_source, r.source), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (r.settings.isNotEmpty()) {
+        Section(stringResource(R.string.s_settings)) {
+            r.settings.forEach { (k, v) -> Text("$k: $v", style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+    Section(stringResource(R.string.s_evidence)) {
+        r.evidence.forEach { line ->
+            Text("• $line", style = MaterialTheme.typography.bodyMedium,
+                fontFamily = if (line.contains("SHA-256")) FontFamily.Monospace else FontFamily.Default)
+        }
+    }
+    val labels = ReportLabels(
+        title = stringResource(R.string.r_title), status = stringResource(R.string.r_status),
+        source = stringResource(R.string.r_source), evidence = stringResource(R.string.s_evidence),
+        positive = stringResource(R.string.r_positive), negative = stringResource(R.string.r_negative),
+        settings = stringResource(R.string.s_settings), notFound = stringResource(R.string.r_not_found),
+        limitations = stringResource(R.string.s_limits)
+    )
+    val chooser = stringResource(R.string.share_chooser)
+    OutlinedButton(onClick = {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, ScanReport.format(r, labels))
+        }
+        context.startActivity(Intent.createChooser(send, chooser))
+    }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.share)) }
+    Section(stringResource(R.string.s_limits)) {
+        Text(r.caveat, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Spacer(Modifier.height(24.dp))
+}
+
+@Composable
+private fun PromptCard(title: String, text: String, copyLabel: String, context: Context) {
+    val copied = stringResource(R.string.copied)
+    Section(title) {
+        SelectionContainer { Text(text, style = MaterialTheme.typography.bodyMedium) }
+        TextButton(onClick = {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText(title, text))
+            if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+        }) { Text(copyLabel) }
+    }
+}
+
+@Composable
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary)
+            content()
         }
     }
 }

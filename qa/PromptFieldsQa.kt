@@ -22,5 +22,9 @@ fun main() {
     test("JSON graph not a prompt", PromptFieldsResolver.resolve(mapOf("prompt" to "{\"1\":{}}"), "{\"1\":{}}").positive == null)
     test("negative plus JSON not positive", PromptFieldsResolver.resolve(mapOf("negative_prompt" to "bad", "prompt" to "{\"1\":{}}"), "{\"1\":{}}").positive == null)
     test("generic prompt retained", PromptFieldsResolver.resolve(mapOf("prompt" to "a cat"), "a cat").positive == "a cat")
-    println("$passed/15 prompt-field tests passed")
+    val exif = PromptFieldsResolver.resolve(mapOf("UserComment" to "neon street\nNegative prompt: lowres\nSteps: 25, Seed: 7, Model: x"), null)
+    test("A1111 in UserComment positive", exif.positive == "neon street")
+    test("A1111 in UserComment negative", exif.negative == "lowres")
+    test("A1111 settings exposed", exif.settings["Model"] == "x" && exif.originKind == PromptOrigin.SETTINGS)
+    println("$passed/18 prompt-field tests passed")
 }

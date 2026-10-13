@@ -24,4 +24,21 @@ fun main() {
     val negativeOnly = MetadataAssessor.assess(mapOf("negative_prompt" to "low quality"))
     check(negativeOnly.rawPrompt == "low quality" && negativeOnly.status.contains("unverified"))
     println("PASS: negative-only metadata still assessed without promotion")
+    checkCase("C2PA declared AI", mapOf("c2pa.present" to "true", "c2pa.digital_source_type" to "trainedAlgorithmicMedia"),
+        "AI generation declared in metadata (unverified)")
+    checkCase("IPTC URL in raw XMP", mapOf("xmp" to "<x>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</x>"),
+        "AI generation declared in metadata (unverified)")
+    checkCase("composite is edit, not generation", mapOf("digital_source_type" to "compositeWithTrainedAlgorithmicMedia"),
+        "AI editing declared in metadata (unverified)")
+    checkCase("A1111 infotext in EXIF UserComment", mapOf("UserComment" to "a castle\nSteps: 30, Sampler: Euler a, Seed: 1"),
+        "AI creation metadata found (unverified)")
+    check(MetadataAssessor.assess(mapOf("UserComment" to "a castle\nSteps: 30, Seed: 1")).rawPrompt!!.startsWith("a castle"))
+    println("PASS: A1111 UserComment becomes the prompt source")
+    checkCase("ambiguous name in description is not a tool", mapOf("ImageDescription" to "Gemini constellation at night"),
+        "Description found; origin unknown")
+    checkCase("ambiguous name in software field is a tool", mapOf("Software" to "Google Gemini"),
+        "AI creation metadata found (unverified)")
+    checkCase("C2PA generator ChatGPT", mapOf("c2pa.present" to "true", "c2pa.generator" to "ChatGPT"),
+        "AI creation metadata found (unverified)")
+    checkCase("C2PA from a camera only", mapOf("c2pa.present" to "true", "c2pa.generator" to "Samsung Camera"), "Origin unknown")
 }

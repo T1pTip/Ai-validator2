@@ -3,10 +3,10 @@ package com.aiorigin.detector
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
-/** Bounded RIFF/WebP XMP extractor. XMP is untrusted, and not provenance proof. */
+/** Bounded RIFF/WebP XMP and C2PA extractor. Embedded data is untrusted, not provenance proof. */
 object WebpMetadataReader {
     private const val MAX_CHUNK = 2 * 1024 * 1024
-    private const val MAX_SCAN = 32L * 1024 * 1024
+    private const val MAX_SCAN = 256L * 1024 * 1024
     private const val MAX_XMP = 256_000
 
     fun read(input: InputStream): Map<String, String> {
@@ -24,10 +24,17 @@ object WebpMetadataReader {
             val padded = length + (length and 1)
             if (length < 0 || padded > remaining) break
             val kind = String(chunkHeader, 0, 4, StandardCharsets.US_ASCII)
-            if (kind == "XMP " && length <= MAX_CHUNK) {
+            if ((kind == "XMP " || kind == "C2PA") && length <= MAX_CHUNK) {
                 val bytes = readExact(input, length.toInt()) ?: break
-                val text = String(bytes, StandardCharsets.UTF_8).trim('\u0000', ' ', '\n', '\r')
-                if (text.isNotBlank()) result["xmp"] = text.take(MAX_XMP)
+                if (kind == "XMP ") {
+                    val text = String(bytes, StandardCharsets.UTF_8).trim('\u0000', ' ', '\n', '\r')
+                    if (text.isNotBlank()) {
+                        result["xmp"] = text.take(MAX_XMP)
+                        for ((k, v) in XmpFields.extract(text)) result.putIfAbsent(k, v)
+                    }
+                } else {
+                    C2paSniffer.inspect(bytes)?.let { result.putAll(C2paSniffer.toMetadata(it)) }
+                }
                 if ((length and 1L) != 0L && !skipExact(input, 1)) break
             } else {
                 if (!skipExact(input, padded)) break
@@ -55,6 +62,7 @@ object WebpMetadataReader {
         var left = amount
         val buffer = ByteArray(8192)
         while (left > 0) {
+            if (Thread.currentThread().isInterrupted) return false
             val n = input.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
             if (n <= 0) return false
             left -= n

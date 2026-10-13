@@ -1,13 +1,15 @@
 package com.aiorigin.detector
 
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
-/** Bounded JPEG COM/XMP extraction. Does not authenticate provenance. */
+/** Bounded JPEG COM/XMP/C2PA extraction. Does not authenticate provenance. */
 object JpegMetadataReader {
     private const val MAX_SEGMENT = 65_533
-    private const val MAX_TOTAL = 2_000_000
+    private const val MAX_TOTAL = 16_000_000
     private const val MAX_TEXT = 200_000
+    private const val MAX_C2PA = 4_000_000
     private val xmpPrefix = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(StandardCharsets.US_ASCII)
 
     fun read(input: InputStream): Map<String, String> {
@@ -15,6 +17,7 @@ object JpegMetadataReader {
         if (input.read() != 0xff || input.read() != 0xd8) return result
         var consumed = 2
         var comments = 0
+        val c2pa = ByteArrayOutputStream()
         while (consumed < MAX_TOTAL) {
             var markerStart = input.read()
             if (markerStart != 0xff) break
@@ -34,7 +37,7 @@ object JpegMetadataReader {
             var offset = 0
             while (offset < length) {
                 val n = input.read(bytes, offset, length - offset)
-                if (n <= 0) return result
+                if (n <= 0) return finish(result, c2pa)
                 offset += n
             }
             consumed += length
@@ -44,16 +47,18 @@ object JpegMetadataReader {
                 comments++
             } else if (markerStart == 0xe1 && bytes.size > xmpPrefix.size && bytes.copyOfRange(0, xmpPrefix.size).contentEquals(xmpPrefix)) {
                 val xml = bytes.copyOfRange(xmpPrefix.size, bytes.size).toString(StandardCharsets.UTF_8)
-                // Text-only extraction: no XML entity expansion or external resource resolution.
-                val attributes = Regex("(?:[A-Za-z_][\\w.-]*:)?(prompt|negative_prompt|description|software)\\s*=\\s*[\"']([^\"']{1,100000})[\"']", RegexOption.IGNORE_CASE)
-                for (match in attributes.findAll(xml)) result.putIfAbsent(match.groupValues[1].lowercase(), decodeEntities(match.groupValues[2]).take(MAX_TEXT))
-                val elements = Regex("<(?:[A-Za-z_][\\w.-]*:)?(prompt|negative_prompt|description|software)\\b[^>]*>([^<]{1,100000})</", RegexOption.IGNORE_CASE)
-                for (match in elements.findAll(xml)) result.putIfAbsent(match.groupValues[1].lowercase(), decodeEntities(match.groupValues[2]).take(MAX_TEXT))
+                for ((k, v) in XmpFields.extract(xml)) result.putIfAbsent(k, v)
+                result.putIfAbsent("xmp", xml.take(MAX_TEXT))
+            } else if (markerStart == 0xeb && c2pa.size() + bytes.size <= MAX_C2PA) {
+                // APP11 carries JUMBF boxes; C2PA manifests may span several segments.
+                c2pa.write(bytes)
             }
         }
-        return result
+        return finish(result, c2pa)
     }
 
-    private fun decodeEntities(value: String) = value.replace("&quot;", "\"").replace("&apos;", "'")
-        .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    private fun finish(result: MutableMap<String, String>, c2pa: ByteArrayOutputStream): Map<String, String> {
+        if (c2pa.size() > 0) C2paSniffer.inspect(c2pa.toByteArray())?.let { result.putAll(C2paSniffer.toMetadata(it)) }
+        return result
+    }
 }
