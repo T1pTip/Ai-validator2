@@ -77,8 +77,9 @@ class MainActivity : ComponentActivity() {
 
     private fun sharedUri(intent: Intent?): Uri? {
         if (intent?.action != Intent.ACTION_SEND) return null
-        return if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-        else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
+        if (Build.VERSION.SDK_INT >= 33) return intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        @Suppress("DEPRECATION")
+        return intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
     }
 }
 

@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +9,7 @@ plugins {
 val debugKeystore: File = layout.buildDirectory.file("debug-signing/debug.keystore").get().asFile.also { ks ->
     if (!ks.exists()) {
         ks.parentFile.mkdirs()
-        ks.writeBytes(java.util.Base64.getDecoder().decode(file("debug.keystore.b64").readText().trim()))
+        ks.writeBytes(Base64.getDecoder().decode(file("debug.keystore.b64").readText().trim()))
     }
 }
 android {
