@@ -9,7 +9,7 @@ import java.nio.FloatBuffer
 import java.nio.LongBuffer
 
 /**
- * On-device image description with Florence-2-base-ft (Microsoft, MIT licence; int8 ONNX export by
+ * On-device image description with Florence-2-base-ft (Microsoft, MIT licence; uint8 ONNX export by
  * onnx-community). Greedy decoding with forced BOS and no-repeat trigrams, identical to
  * tools/model/florence_reference.py, which the instrumentation test compares against.
  */

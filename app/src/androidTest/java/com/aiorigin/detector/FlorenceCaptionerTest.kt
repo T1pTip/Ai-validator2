@@ -35,7 +35,7 @@ class FlorenceCaptionerTest {
             Log.i("FlorenceTest", "$name ${caption.millis} ms: ${caption.text}")
             if (caption.ids == expectedIds) exact++
             else Log.w("FlorenceTest", "$name differs from reference: ${g.getString("caption")}")
-            // int8 kernels can differ slightly per CPU; the first sentence must still agree.
+            // quantized kernels can differ slightly per CPU; the first sentence must still agree.
             val firstSentence = g.getString("caption").substringBefore('.')
             assertTrue("$name: '${caption.text}' vs '${g.getString("caption")}'", caption.text.startsWith(firstSentence))
         }
@@ -51,7 +51,7 @@ class FlorenceCaptionerTest {
         val old = ModelDownloader.baseUrl
         try {
             // Point at a server path that returns a different file; the checksum check must refuse it.
-            ModelDownloader.baseUrl = "https://huggingface.co/${ModelDownloader.REPO}/resolve/${ModelDownloader.REVISION}/onnx/encoder_model_int8.onnx?x="
+            ModelDownloader.baseUrl = "https://huggingface.co/${ModelDownloader.REPO}/resolve/${ModelDownloader.REVISION}/onnx/encoder_model_uint8.onnx?x="
             val failed = runCatching { ModelDownloader.download(ctx) { _, _ -> } }.isFailure
             assertTrue("mismatching file must be rejected", failed)
             assertEquals(false, f.exists())

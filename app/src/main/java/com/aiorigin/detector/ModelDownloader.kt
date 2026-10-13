@@ -19,11 +19,12 @@ object ModelDownloader {
     /** Replaced only by instrumentation tests. */
     @Volatile var baseUrl = "https://huggingface.co/$REPO/resolve/$REVISION/"
 
+    // uint8 exports: Android's ONNX Runtime has no ConvInteger kernel for the int8 vision encoder.
     val FLORENCE = listOf(
-        ModelFile("onnx/vision_encoder_int8.onnx", 93_746_478, "d7876c1ab0f7ec11998942ca189e99a775c5a4a912b813c7745d0f6fa9343487"),
-        ModelFile("onnx/embed_tokens_int8.onnx", 39_390_433, "6b2258db1c8ee9b160576ccde3cd3814d83a2edaed0dd1c6ca9ff3c38fa62214"),
-        ModelFile("onnx/encoder_model_int8.onnx", 43_651_493, "f4ad7a68f1fb875d3bcf735ea14a7021b7ba7e83baf7cf10289881b4ed6d9b85"),
-        ModelFile("onnx/decoder_model_merged_int8.onnx", 98_177_697, "f22f52f980c33df0efa15932c2f3db6d9d3595ce6387eca938b8cfe23dc4c641")
+        ModelFile("onnx/vision_encoder_uint8.onnx", 93_746_540, "3b79d54f23f666f731549db23cb070c35a979ce19cbd9720e90e67a78dc9768c"),
+        ModelFile("onnx/embed_tokens_uint8.onnx", 39_390_432, "3bb20ac178b52950364abf1a6c0a2f3c3a172a27ea4fdb7c1c3299bca35f8879"),
+        ModelFile("onnx/encoder_model_uint8.onnx", 43_651_512, "653648259f099dfb5ed74e1b8b47c41020f3a90f922390aa25fd9bc5805e2fdd"),
+        ModelFile("onnx/decoder_model_merged_uint8.onnx", 98_177_678, "c0bfddc38e75915ab899018832056a6741fa367525bf76fa760aac6c56e00bb1")
     )
     val TOTAL_BYTES = FLORENCE.sumOf { it.bytes }
 
