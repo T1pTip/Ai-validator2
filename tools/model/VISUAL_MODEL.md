@@ -73,3 +73,23 @@ says so and points to the cloud check.
 
 **On-device verification:** in the emulator, Android logits matched the Python reference to within
 3e-5 for every fixture (PNG, JPEG and WebP). Inference took about 300 ms per image on x86_64.
+
+# On-device description (prompt reconstruction)
+
+## Model
+- Florence-2-base-ft (Microsoft, MIT licence), using the uint8 ONNX export from
+  `onnx-community/Florence-2-base-ft` at revision `e88a44ea…`.
+- The int8 export cannot be used: Android's ONNX Runtime has no int8 `ConvInteger` kernel.
+- The model is downloaded once, on request (about 275 MB), and every file is checked against its
+  SHA-256.
+- Task: `<MORE_DETAILED_CAPTION>`, greedy decoding, forced BOS, no repeated trigrams.
+- Reference implementation: `tools/model/florence_reference.py`.
+
+## Why the test uses teacher forcing
+The quantized model is not reproducible word for word across runtimes, because its
+dynamically-quantized integer kernels differ.
+- ORT 1.20 and ORT 1.29 on the same x86 machine already pick different words, for example "wires"
+  and "wigs" for the same picture.
+- The emulator test therefore feeds the reference token ids (teacher forcing) and requires the
+  model's own choice to agree at 75% or more of the steps. Across ORT versions, agreement was 80–95%.
+- A broken pipeline (preprocessing, encoder, KV cache or decoding) gives agreement near zero.

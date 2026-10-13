@@ -57,7 +57,8 @@ class Florence:
         self.tokenizer = Tokenizer.from_file(os.path.join(model_dir, "tokenizer.json"))
         self.prompt_ids = self.tokenizer.encode(TASK_PROMPT).ids
 
-    def generate_ids(self, img):
+    def generate_ids(self, img, teacher=None):
+        """Greedy ids; with `teacher`, follows those ids and returns (ids, agreement)."""
         feats = self.vision.run(None, {"pixel_values": pixel_values(img)})[0]
         prompt = self.embed.run(None, {"input_ids": np.array([self.prompt_ids], dtype=np.int64)})[0]
         inputs = np.concatenate([feats, prompt], axis=1)
@@ -70,7 +71,8 @@ class Florence:
                     past[f"past_key_values.{l}.{kind}.{kv}"] = np.zeros((1, HEADS, 0, HEAD_DIM), dtype=np.float32)
         generated = []
         token = DECODER_START
-        for step in range(MAX_NEW):
+        agreed = compared = 0
+        for step in range(len(teacher) if teacher else MAX_NEW):
             emb = self.embed.run(None, {"input_ids": np.array([[token]], dtype=np.int64)})[0]
             feed = {"encoder_attention_mask": mask, "encoder_hidden_states": hidden, "inputs_embeds": emb,
                     "use_cache_branch": np.array([step > 0])}
@@ -89,10 +91,14 @@ class Florence:
                 for b in banned_tokens(generated):
                     logits[b] = -np.inf
                 token = int(np.argmax(logits))
+                if teacher:
+                    compared += 1
+                    agreed += token == teacher[step]
+                    token = teacher[step]
             generated.append(token)
-            if token == EOS:
+            if token == EOS and not teacher:
                 break
-        return generated
+        return (generated, agreed / max(1, compared)) if teacher else generated
 
     def caption(self, img):
         ids = self.generate_ids(img)

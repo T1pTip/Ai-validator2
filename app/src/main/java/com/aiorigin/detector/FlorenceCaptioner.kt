@@ -20,7 +20,8 @@ object FlorenceCaptioner {
     private const val HEAD_DIM = 64
     private const val MAX_NEW_TOKENS = 256
 
-    data class Caption(val text: String, val ids: List<Int>, val millis: Long)
+    /** [agreement]: with teacher forcing, the share of steps where the model's own choice matched. */
+    data class Caption(val text: String, val ids: List<Int>, val millis: Long, val agreement: Float? = null)
 
     private class Sessions(val vision: OrtSession, val embed: OrtSession, val encoder: OrtSession, val decoder: OrtSession)
 
@@ -45,7 +46,12 @@ object FlorenceCaptioner {
         ).also { vocab = it }
     }
 
-    fun caption(context: Context, argb: IntArray, width: Int, height: Int): Caption {
+    /**
+     * [teacherForce] (tests only): follow these token ids instead of the model's choices and report
+     * how often the model agreed. This checks the whole pipeline without depending on argmax ties,
+     * which quantized kernels on different CPUs break differently.
+     */
+    fun caption(context: Context, argb: IntArray, width: Int, height: Int, teacherForce: List<Int>? = null): Caption {
         val start = System.currentTimeMillis()
         val s = sessions(context)
         val env = OrtEnvironment.getEnvironment()
@@ -85,7 +91,10 @@ object FlorenceCaptioner {
             val generated = ArrayList<Int>()
             var token = FlorenceText.DECODER_START
             var previousStep: OrtSession.Result? = null
-            for (step in 0 until MAX_NEW_TOKENS) {
+            var agreed = 0
+            var compared = 0
+            val steps = teacherForce?.size ?: MAX_NEW_TOKENS
+            for (step in 0 until steps) {
                 check()
                 val ids = OnnxTensor.createTensor(env, LongBuffer.wrap(longArrayOf(token)), longArrayOf(1, 1))
                 val embOut = s.embed.run(mapOf("input_ids" to ids))
@@ -117,13 +126,18 @@ object FlorenceCaptioner {
                     var best = -1
                     var bestValue = Float.NEGATIVE_INFINITY
                     for (i in row.indices) if (i !in banned && row[i] > bestValue) { bestValue = row[i]; best = i }
-                    best.toLong()
+                    if (teacherForce != null) {
+                        compared++
+                        if (best == teacherForce[step]) agreed++
+                        teacherForce[step].toLong()
+                    } else best.toLong()
                 }
                 generated.add(token.toInt())
                 if (token == FlorenceText.EOS) break
             }
             previousStep?.close()
-            return Caption(FlorenceText.decode(generated, vocab(context)), generated, System.currentTimeMillis() - start)
+            return Caption(FlorenceText.decode(generated, vocab(context)), generated, System.currentTimeMillis() - start,
+                if (compared > 0) agreed.toFloat() / compared else null)
         } finally {
             toClose.asReversed().forEach { runCatching { it.close() } }
         }
