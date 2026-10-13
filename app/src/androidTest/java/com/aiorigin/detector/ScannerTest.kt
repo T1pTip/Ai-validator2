@@ -29,7 +29,6 @@ class ScannerTest {
             val expected = when (VisualBand.of(r.visual!!.probability)) {
                 VisualBand.LIKELY_AI -> R.string.v_visual_likely
                 VisualBand.LEANS_AI -> R.string.v_visual_leans
-                VisualBand.UNCLEAR -> R.string.v_visual_unclear
                 VisualBand.NO_SIGNS -> R.string.v_visual_none
             }
             assertEquals(name, ctx.getString(expected), r.status)
@@ -45,5 +44,25 @@ class ScannerTest {
             assertNotNull("$name visual score", r.visual)
             assertTrue("$name probability range", r.visual!!.probability in 0f..1f)
         }
+    }
+
+    @Test fun videoGetsFrameScoresAndCloudFrames() {
+        val uri = TestFiles.fixture("clip.mp4")
+        val r = runBlocking { Scanner.scan(ctx, uri, typeHint = "video/mp4") }
+        assertTrue("detected as video", r.isVideo)
+        val v = r.visual
+        assertNotNull("video visual score", v)
+        assertTrue("frames scored: ${v!!.frames}", v.frames in 1..3)
+        assertEquals(v.frames, v.frameProbabilities.size)
+        assertEquals(v.frameProbabilities.max(), v.probability, 1e-6f)
+        val frames = CloudCheck.prepareVideoFrames(ctx, uri)
+        assertTrue("cloud frames: ${frames.size}", frames.size in 1..CloudCheck.VIDEO_FRAMES)
+        frames.forEach { assertTrue("JPEG", it.size > 1000 && it[0] == 0xFF.toByte() && it[1] == 0xD8.toByte()) }
+    }
+
+    @Test fun smallImagesAreUploadedUnchanged() {
+        val uri = TestFiles.fixture("qa_camera.jpg")
+        val original = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        assertTrue(original.contentEquals(CloudCheck.prepareImage(ctx, uri)))
     }
 }

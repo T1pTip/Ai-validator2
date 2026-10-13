@@ -92,12 +92,10 @@
     <!-- Stage 2: visual check -->
     <string name="v_visual_likely">הבדיקה החזותית מצביעה על AI</string>
     <string name="v_visual_leans">הבדיקה החזותית נוטה ל-AI</string>
-    <string name="v_visual_unclear">הבדיקה החזותית לא חד-משמעית</string>
     <string name="v_visual_none">הבדיקה החזותית לא מצאה סימני AI</string>
-    <string name="x_visual_likely">המודל המקומי מעריך בסבירות גבוהה שהתמונה נוצרה ב-AI. זו הערכה ולא הוכחה. לחוות דעת נוספת אפשר לבדוק גם בענן.</string>
-    <string name="x_visual_leans">המודל המקומי נוטה לחשוב שהתמונה נוצרה ב-AI, אבל בלי ודאות. מומלץ לבדוק גם בענן.</string>
-    <string name="x_visual_unclear">המודל המקומי לא הגיע להכרעה. מומלץ לבדוק בענן.</string>
-    <string name="x_visual_none">המודל המקומי לא זיהה סימני AI. הוא מפספס הרבה תמונות מהמחוללים החדשים, ולכן זה לא מוכיח שהתמונה אמיתית. לבדיקה נוספת אפשר לבדוק בענן.</string>
+    <string name="x_visual_likely">המודל המקומי מעריך שהתמונה נוצרה ב-AI. במבחן על 392 תמונות, כמעט כל התמונות שקיבלו ציון כזה אכן היו תמונות AI. זו עדיין הערכה ולא הוכחה.</string>
+    <string name="x_visual_leans">המודל המקומי מצא סימנים חלשים ל-AI. במבחן על 392 תמונות, רוב התמונות עם ציון כזה היו AI, אבל לא כולן. מומלץ לבדוק גם בענן.</string>
+    <string name="x_visual_none">המודל המקומי לא זיהה סימני AI, אבל זה לא אומר הרבה: במבחן על 392 תמונות הוא זיהה רק כרבע מתמונות ה-AI של המחוללים החדשים (Midjourney 7, GPT-image, Flux ודומיהם). מומלץ לבדוק בענן.</string>
     <string name="e_visual">בדיקה חזותית מקומית: %1$d%% סבירות ל-AI (%2$s, %3$d ms)</string>
     <string name="e_visual_video">בדיקה חזותית מקומית: עד %1$d%% סבירות ל-AI ב-%2$d פריימים (%3$s, %4$d ms)</string>
     <string name="e_visual_failed">הבדיקה החזותית המקומית לא רצה: %1$s</string>

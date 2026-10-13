@@ -28,16 +28,17 @@ data class ScanResult(
     val visualHeadline: Boolean = false
 )
 
-/** Visual estimate bands; thresholds come from the evaluation in tools/model (see VISUAL_MODEL.md). */
-enum class VisualBand { LIKELY_AI, LEANS_AI, UNCLEAR, NO_SIGNS;
+/**
+ * Visual estimate bands, calibrated on 392 OpenFake test images (tools/model/VISUAL_MODEL.md):
+ * the model almost never flags real photos (1 of 171 at 0.1+), but misses most modern AI images.
+ */
+enum class VisualBand { LIKELY_AI, LEANS_AI, NO_SIGNS;
     companion object {
-        const val LIKELY = 0.85f
-        const val LEANS = 0.6f
-        const val UNCLEAR_FLOOR = 0.4f
+        const val LIKELY = 0.5f
+        const val LEANS = 0.1f
         fun of(p: Float): VisualBand = when {
             p >= LIKELY -> LIKELY_AI
             p >= LEANS -> LEANS_AI
-            p >= UNCLEAR_FLOOR -> UNCLEAR
             else -> NO_SIGNS
         }
     }
@@ -117,7 +118,6 @@ object Scanner {
         val (title, explanation) = if (visualHeadline) when (VisualBand.of(visual!!.probability)) {
             VisualBand.LIKELY_AI -> R.string.v_visual_likely to R.string.x_visual_likely
             VisualBand.LEANS_AI -> R.string.v_visual_leans to R.string.x_visual_leans
-            VisualBand.UNCLEAR -> R.string.v_visual_unclear to R.string.x_visual_unclear
             VisualBand.NO_SIGNS -> R.string.v_visual_none to R.string.x_visual_none
         } else if (c2paOnly) R.string.v_c2pa_only to R.string.x_c2pa_only else when (assessment.level) {
             OriginLevel.AI_DECLARED -> R.string.v_ai_declared to R.string.x_declared
