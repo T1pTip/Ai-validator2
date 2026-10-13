@@ -1,0 +1,74 @@
+[
+ {
+  "file": "qa_a1111.png",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "9ba9015d9d8b6a51e4cc7bc226c629d987447dba5d855c729757a65691065999",
+  "logit": -5.318611,
+  "probability": 0.004876
+ },
+ {
+  "file": "qa_c2pa_sample.jpg",
+  "width": 1024,
+  "height": 683,
+  "rgbSha256": "16e19e80582a8a0e550c3488ff12434f45fd273effa23f9a42cd2825262b775c",
+  "logit": -9.160421,
+  "probability": 0.000105
+ },
+ {
+  "file": "qa_camera.jpg",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "bbaead82163d8765f6ac00525a362dd391a4d591603653be2d5582cb5200e1b7",
+  "logit": -6.256987,
+  "probability": 0.001913
+ },
+ {
+  "file": "qa_comfyui.png",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "d2ff9ce38bb152dc45e336c98bc937f6326d01d2cd2f671be4ce5cc3bc2e1f3e",
+  "logit": -6.39396,
+  "probability": 0.001669
+ },
+ {
+  "file": "qa_iptc_ai.jpg",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "e6ea8f6df5c3b15e93708a03e74f6b541603ae2dc253a00f42ad11a2a8baaeab",
+  "logit": -5.376935,
+  "probability": 0.004601
+ },
+ {
+  "file": "qa_plain.jpg",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "03da7d4f551491ceb53617a31a395e841461f1adc9c169decd59164e5db994fa",
+  "logit": -6.447556,
+  "probability": 0.001582
+ },
+ {
+  "file": "qa_prompt.webp",
+  "width": 512,
+  "height": 384,
+  "rgbSha256": "cdc16203f9128c8b998c9b515e3652f87ef487131870ddbffc8bfa63f210cf38",
+  "logit": -5.054163,
+  "probability": 0.006342
+ },
+ {
+  "file": "street.png",
+  "width": 719,
+  "height": 480,
+  "rgbSha256": "9cb1e09b69b60f7718ad4e9d7c8649deafa7891b1c09db68ffcb9db5a922b86d",
+  "logit": -9.427748,
+  "probability": 8e-05
+ },
+ {
+  "file": "synthetic.png",
+  "width": 640,
+  "height": 480,
+  "rgbSha256": "5e2ac78761f763a0d1c0e01c22dd723ec78b1ef7487e28cf6be8ca88992ddb5d",
+  "logit": -1.862957,
+  "probability": 0.134359
+ }
+]

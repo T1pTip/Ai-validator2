@@ -21,8 +21,27 @@ data class ScanResult(
     val explanation: String = "",
     val isVideo: Boolean = false,
     /** Embedded description/comment. Shown separately and never presented as a prompt. */
-    val description: String? = null
+    val description: String? = null,
+    /** On-device visual estimate; null when it could not run (see evidence). */
+    val visual: LocalDetector.Score? = null,
+    /** True when the headline comes from the visual estimate rather than from metadata. */
+    val visualHeadline: Boolean = false
 )
+
+/** Visual estimate bands; thresholds come from the evaluation in tools/model (see VISUAL_MODEL.md). */
+enum class VisualBand { LIKELY_AI, LEANS_AI, UNCLEAR, NO_SIGNS;
+    companion object {
+        const val LIKELY = 0.85f
+        const val LEANS = 0.6f
+        const val UNCLEAR_FLOOR = 0.4f
+        fun of(p: Float): VisualBand = when {
+            p >= LIKELY -> LIKELY_AI
+            p >= LEANS -> LEANS_AI
+            p >= UNCLEAR_FLOOR -> UNCLEAR
+            else -> NO_SIGNS
+        }
+    }
+}
 
 /**
  * Runs the independent local checks in parallel (file fingerprint, embedded metadata,
@@ -44,18 +63,34 @@ object Scanner {
             runInterruptible { if (isVideo) videoMetadata(context, uri) else imageMetadata(context, uri, header) }
         }
         val frames = if (isVideo) async(Dispatchers.IO) { runInterruptible { videoFrames(context, uri) } } else null
+        val visual = async(Dispatchers.Default) { runInterruptible { visualCheck(context, uri, isVideo) } }
 
         val evidence = sourceEvidence.toMutableList()
         evidence.add(fingerprint.await())
         val meta = metadata.await()
         evidence.addAll(meta.evidence)
         frames?.let { evidence.addAll(it.await()) }
-        build(context, meta.metadata, evidence, isVideo, meta.readFailed)
+        val (score, visualEvidence) = visual.await()
+        evidence.add(visualEvidence)
+        build(context, meta.metadata, evidence, isVideo, meta.readFailed, score)
+    }
+
+    /** Runs the on-device detector; failures are reported as evidence instead of failing the scan. */
+    private fun visualCheck(context: Context, uri: Uri, isVideo: Boolean): Pair<LocalDetector.Score?, String> = try {
+        val score = if (isVideo) LocalDetector.scoreVideo(context, uri) else LocalDetector.scoreImage(context, uri)
+        val percent = Math.round(score.probability * 100)
+        score to if (isVideo) context.getString(R.string.e_visual_video, percent, score.frames, LocalDetector.MODEL_NAME, score.millis)
+            else context.getString(R.string.e_visual, percent, LocalDetector.MODEL_NAME, score.millis)
+    } catch (e: InterruptedException) {
+        throw e
+    } catch (e: Throwable) {
+        if (e is OutOfMemoryError) System.gc()
+        null to context.getString(R.string.e_visual_failed, e.javaClass.simpleName)
     }
 
     private fun build(
         context: Context, metadata: Map<String, String>, evidence: MutableList<String>,
-        isVideo: Boolean, readFailed: Boolean
+        isVideo: Boolean, readFailed: Boolean, visual: LocalDetector.Score?
     ): ScanResult {
         val assessment = MetadataAssessor.assess(metadata)
         if (assessment.level == OriginLevel.AI_DECLARED) evidence.add(context.getString(R.string.e_declared))
@@ -73,7 +108,18 @@ object Scanner {
         // A manifest without an AI declaration is still a finding; don't headline it as "no signs found".
         val c2paOnly = assessment.c2paPresent &&
             (assessment.level == OriginLevel.UNKNOWN || assessment.level == OriginLevel.DESCRIPTION)
-        val (title, explanation) = if (c2paOnly) R.string.v_c2pa_only to R.string.x_c2pa_only else when (assessment.level) {
+        // Metadata that names a tool or declares AI outranks the visual estimate; otherwise the
+        // visual estimate is the most informative headline (most shared media has no metadata).
+        val metadataDecides = readFailed || assessment.level in setOf(
+            OriginLevel.AI_DECLARED, OriginLevel.AI_EDITED, OriginLevel.AI_TOOL, OriginLevel.PROMPT
+        )
+        val visualHeadline = visual != null && !metadataDecides
+        val (title, explanation) = if (visualHeadline) when (VisualBand.of(visual!!.probability)) {
+            VisualBand.LIKELY_AI -> R.string.v_visual_likely to R.string.x_visual_likely
+            VisualBand.LEANS_AI -> R.string.v_visual_leans to R.string.x_visual_leans
+            VisualBand.UNCLEAR -> R.string.v_visual_unclear to R.string.x_visual_unclear
+            VisualBand.NO_SIGNS -> R.string.v_visual_none to R.string.x_visual_none
+        } else if (c2paOnly) R.string.v_c2pa_only to R.string.x_c2pa_only else when (assessment.level) {
             OriginLevel.AI_DECLARED -> R.string.v_ai_declared to R.string.x_declared
             OriginLevel.AI_EDITED -> R.string.v_ai_edited to R.string.x_edited
             OriginLevel.AI_TOOL -> R.string.v_ai_tool to R.string.x_tool
@@ -106,7 +152,9 @@ object Scanner {
             level = assessment.level,
             explanation = context.getString(explanation),
             isVideo = isVideo,
-            description = MetadataAssessor.description(metadata)?.takeIf { it != fields.positive }
+            description = MetadataAssessor.description(metadata)?.takeIf { it != fields.positive },
+            visual = visual,
+            visualHeadline = visualHeadline
         )
     }
 

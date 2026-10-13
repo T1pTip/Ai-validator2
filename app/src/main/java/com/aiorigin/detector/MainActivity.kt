@@ -24,6 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -111,7 +113,12 @@ private fun AppScreen(viewModel: ScanViewModel) {
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(stringResource(R.string.app_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            var showSettings by rememberSaveable { mutableStateOf(false) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.app_title), Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showSettings = true }, modifier = Modifier.testTag("settings")) { Text(stringResource(R.string.settings)) }
+            }
+            if (showSettings) SettingsDialog(viewModel) { showSettings = false }
             Text(stringResource(R.string.subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             DeviceCard(profile)
             Button(
@@ -133,7 +140,7 @@ private fun AppScreen(viewModel: ScanViewModel) {
                     Text(notice, Modifier.fillMaxWidth().padding(14.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
-            state.result?.let { ResultView(it) }
+            state.result?.let { ResultView(it, state, viewModel) }
         }
     }
 }
@@ -190,19 +197,36 @@ private fun DeviceCard(profile: DeviceProfile) {
 }
 
 @Composable
-private fun ResultView(r: ScanResult) {
+private fun ResultView(r: ScanResult, state: ScanUiState, viewModel: ScanViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val signal = r.level in setOf(OriginLevel.AI_DECLARED, OriginLevel.AI_EDITED, OriginLevel.AI_TOOL, OriginLevel.PROMPT)
+    val visualSignal = r.visualHeadline && r.visual != null &&
+        VisualBand.of(r.visual.probability) in setOf(VisualBand.LIKELY_AI, VisualBand.LEANS_AI)
+    val signal = visualSignal || (!r.visualHeadline &&
+        r.level in setOf(OriginLevel.AI_DECLARED, OriginLevel.AI_EDITED, OriginLevel.AI_TOOL, OriginLevel.PROMPT))
     Surface(
         color = if (signal) SignalContainer else MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.large
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(r.status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+            Text(r.status, Modifier.testTag("verdict"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                 color = if (signal) OnSignal else MaterialTheme.colorScheme.onSurface)
             Text(r.explanation, style = MaterialTheme.typography.bodyMedium)
         }
     }
+    r.visual?.let { v ->
+        Section(stringResource(R.string.s_visual)) {
+            Text(stringResource(R.string.visual_value, Math.round(v.probability * 100)), Modifier.testTag("visual"),
+                style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            if (v.frames > 1) {
+                Text(stringResource(R.string.visual_frames, v.frames,
+                    v.frameProbabilities.joinToString(" · ") { "${Math.round(it * 100)}%" }),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            Text(stringResource(R.string.visual_note), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    CloudSection(r, state, viewModel)
     r.prompt?.let { PromptCard(stringResource(R.string.s_prompt), it, stringResource(R.string.copy_prompt), context) }
     r.negativePrompt?.let { PromptCard(stringResource(R.string.s_negative), it, stringResource(R.string.copy_negative), context) }
     Text(stringResource(R.string.s_source, r.source), style = MaterialTheme.typography.bodySmall,
@@ -268,4 +292,93 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             content()
         }
     }
+}
+
+@Composable
+private fun CloudSection(r: ScanResult, state: ScanUiState, viewModel: ScanViewModel) {
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    var needKeys by rememberSaveable { mutableStateOf(false) }
+    Section(stringResource(R.string.s_cloud)) {
+        when (val cloud = state.cloud) {
+            CloudState.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.cloud_running))
+            }
+            is CloudState.Done -> {
+                val o = cloud.outcome
+                val percent = Math.round(o.probability * 100)
+                Text(
+                    if (o.frames > 1) stringResource(R.string.cloud_result_video, percent, o.frames)
+                    else stringResource(R.string.cloud_result, percent),
+                    Modifier.testTag("cloud_result"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold
+                )
+                o.topGenerator?.takeIf { it.second >= 0.2f }?.let { (name, score) ->
+                    Text(stringResource(R.string.cloud_generator, name, Math.round(score * 100)), style = MaterialTheme.typography.bodyMedium)
+                }
+                o.operations?.let { Text(stringResource(R.string.cloud_operations, it), style = MaterialTheme.typography.bodySmall) }
+                Text(stringResource(R.string.cloud_note), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            is CloudState.Failed -> Text(cloud.message, Modifier.testTag("cloud_error"), color = MaterialTheme.colorScheme.error)
+            CloudState.Idle -> {}
+        }
+        if (state.cloud != CloudState.Running && state.media != null) {
+            OutlinedButton(
+                onClick = { if (viewModel.hasCloudKeys()) confirm = true else needKeys = true },
+                modifier = Modifier.fillMaxWidth().testTag("cloud_button")
+            ) { Text(stringResource(R.string.cloud_button)) }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.cloud_consent_title)) },
+            text = {
+                Text(if (r.isVideo) stringResource(R.string.cloud_consent_video, CloudCheck.VIDEO_FRAMES)
+                    else stringResource(R.string.cloud_consent_image))
+            },
+            confirmButton = {
+                TextButton(onClick = { confirm = false; viewModel.runCloudCheck() }, modifier = Modifier.testTag("cloud_confirm")) {
+                    Text(stringResource(R.string.cloud_send))
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel_dialog)) } }
+        )
+    }
+    if (needKeys) SettingsDialog(viewModel, message = stringResource(R.string.cloud_no_keys)) { needKeys = false }
+}
+
+@Composable
+private fun SettingsDialog(viewModel: ScanViewModel, message: String? = null, onClose: () -> Unit) {
+    var user by remember { mutableStateOf("") }
+    var secret by remember { mutableStateOf("") }
+    val hint = remember { viewModel.cloudKeyHint() }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(stringResource(R.string.settings_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Text(stringResource(R.string.settings_body), style = MaterialTheme.typography.bodySmall)
+                hint?.let { Text(stringResource(R.string.settings_has_keys, it), style = MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(user, { user = it }, singleLine = true, label = { Text(stringResource(R.string.settings_user)) },
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
+                    modifier = Modifier.testTag("key_user"))
+                OutlinedTextField(secret, { secret = it }, singleLine = true, label = { Text(stringResource(R.string.settings_secret)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
+                    modifier = Modifier.testTag("key_secret"))
+                if (hint != null) TextButton(onClick = { viewModel.clearCloudKeys(); onClose() }) { Text(stringResource(R.string.settings_clear)) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { viewModel.saveCloudKeys(user, secret); onClose() },
+                enabled = user.isNotBlank() && secret.isNotBlank(),
+                modifier = Modifier.testTag("key_save")
+            ) { Text(stringResource(R.string.settings_save)) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel_dialog)) } }
+    )
 }

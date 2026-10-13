@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">גלאי מקור AI</string>
     <string name="app_title">גלאי מקור AI</string>
-    <string name="subtitle">סריקה מקומית בטלפון · שום קובץ לא עולה לענן</string>
+    <string name="subtitle">סריקה מקומית בטלפון · שליחה לענן רק באישור שלך</string>
     <string name="device_line">%1$s · זיכרון פנוי %2$s מתוך %3$s GB · %4$d ליבות · חום: %5$s</string>
     <string name="mode_line">מצב עיבוד מומלץ: %1$s</string>
     <string name="mode_performance">ביצועים</string>
@@ -29,7 +29,7 @@
     <string name="x_tool">נמצאו שם של כלי יצירה או הגדרות יצירה. נתונים כאלה אפשר לערוך ידנית, ולכן הם לא הוכחה.</string>
     <string name="x_prompt">יש בקובץ שדה פרומפט, אבל בלי שם כלי או הצהרה. ייתכן שהתמונה נוצרה ב-AI.</string>
     <string name="x_description">יש בקובץ תיאור טקסטואלי, אבל אין בו סימן ליצירה ב-AI.</string>
-    <string name="x_unknown">רוב האתרים והאפליקציות מוחקים מטא-דאטה, ולכן היעדר סימנים לא מוכיח שהתמונה אמיתית. בדיקה חזותית תתווסף בשלב הבא.</string>
+    <string name="x_unknown">רוב האתרים והאפליקציות מוחקים מטא-דאטה, ולכן היעדר סימנים לא מוכיח שהתמונה אמיתית.</string>
 
     <string name="url_label">או הדבק קישור לתמונה, סרטון או פוסט</string>
     <string name="url_check">בדוק</string>
@@ -57,7 +57,7 @@
     <string name="o_settings">הגדרות יצירה במטא-דאטה (לא מאומת)</string>
     <string name="o_field">שדה פרומפט במטא-דאטה (לא מאומת)</string>
     <string name="o_none">לא נמצא פרומפט מקורי</string>
-    <string name="caveat">הגרסה הזו בודקת רק נתונים שמוטמעים בקובץ. היא עדיין לא מבצעת זיהוי חזותי, אימות חתימת C2PA, חיפוש ברשת או שחזור פרומפט. מטא-דאטה אפשר לערוך או למחוק, ותיאור אינו הוכחה לפרומפט מקורי.</string>
+    <string name="caveat">הבדיקה החזותית המקומית היא הערכה של מודל פתוח, והוא חלש מול המחוללים המסחריים החדשים (Midjourney, Flux, Imagen ודומיהם): הוא עלול לפספס תמונות AI, ולפעמים לסמן תמונה אמיתית. מטא-דאטה אפשר לערוך או למחוק, וחתימת C2PA עדיין לא מאומתת. שום תוצאה כאן אינה הוכחה.</string>
 
     <string name="e_fingerprint">טביעת אצבע SHA-256: %1$s</string>
     <string name="e_fingerprint_skipped">טביעת האצבע דולגה (קובץ מעל 1GB, או שהסריקה בוטלה)</string>
@@ -88,4 +88,53 @@
     <string name="r_positive">פרומפט (לא מאומת)</string>
     <string name="r_negative">פרומפט שלילי (לא מאומת)</string>
     <string name="r_not_found">לא נמצא</string>
+
+    <!-- Stage 2: visual check -->
+    <string name="v_visual_likely">הבדיקה החזותית מצביעה על AI</string>
+    <string name="v_visual_leans">הבדיקה החזותית נוטה ל-AI</string>
+    <string name="v_visual_unclear">הבדיקה החזותית לא חד-משמעית</string>
+    <string name="v_visual_none">הבדיקה החזותית לא מצאה סימני AI</string>
+    <string name="x_visual_likely">המודל המקומי מעריך בסבירות גבוהה שהתמונה נוצרה ב-AI. זו הערכה ולא הוכחה. לחוות דעת נוספת אפשר לבדוק גם בענן.</string>
+    <string name="x_visual_leans">המודל המקומי נוטה לחשוב שהתמונה נוצרה ב-AI, אבל בלי ודאות. מומלץ לבדוק גם בענן.</string>
+    <string name="x_visual_unclear">המודל המקומי לא הגיע להכרעה. מומלץ לבדוק בענן.</string>
+    <string name="x_visual_none">המודל המקומי לא זיהה סימני AI. הוא מפספס הרבה תמונות מהמחוללים החדשים, ולכן זה לא מוכיח שהתמונה אמיתית. לבדיקה נוספת אפשר לבדוק בענן.</string>
+    <string name="e_visual">בדיקה חזותית מקומית: %1$d%% סבירות ל-AI (%2$s, %3$d ms)</string>
+    <string name="e_visual_video">בדיקה חזותית מקומית: עד %1$d%% סבירות ל-AI ב-%2$d פריימים (%3$s, %4$d ms)</string>
+    <string name="e_visual_failed">הבדיקה החזותית המקומית לא רצה: %1$s</string>
+    <string name="s_visual">בדיקה חזותית מקומית</string>
+    <string name="visual_value">סבירות ל-AI לפי המודל המקומי: %1$d%%</string>
+    <string name="visual_frames">נבדקו %1$d פריימים (הציון הגבוה מוצג): %2$s</string>
+    <string name="visual_note">הערכה של מודל פתוח שרץ בטלפון. הוא חלש מול מחוללים מסחריים חדשים.</string>
+
+    <!-- Stage 2: cloud second opinion -->
+    <string name="s_cloud">חוות דעת שנייה מהענן</string>
+    <string name="cloud_button">בדוק בענן (Sightengine)</string>
+    <string name="cloud_running">שולח ל-Sightengine…</string>
+    <string name="cloud_consent_title">לשלוח לענן?</string>
+    <string name="cloud_consent_image">התמונה תישלח לשירות Sightengine לבדיקה. השירות חיצוני, והקובץ יוצא מהטלפון. להמשיך?</string>
+    <string name="cloud_consent_video">%1$d פריימים מהסרטון יישלחו לשירות Sightengine לבדיקה (כל פריים נספר כבדיקה נפרדת). השירות חיצוני, והתמונות יוצאות מהטלפון. להמשיך?</string>
+    <string name="cloud_send">שלח</string>
+    <string name="cloud_result">Sightengine: %1$d%% סבירות ל-AI</string>
+    <string name="cloud_result_video">Sightengine: עד %1$d%% סבירות ל-AI ב-%2$d פריימים</string>
+    <string name="cloud_generator">המחולל הסביר ביותר לפי Sightengine: %1$s (%2$d%%)</string>
+    <string name="cloud_operations">יחידות שנוצלו בבדיקה: %1$d</string>
+    <string name="cloud_no_keys">צריך להגדיר מפתחות Sightengine לפני הבדיקה בענן.</string>
+    <string name="cloud_err_auth">Sightengine דחה את המפתחות. בדוק את ה-API user וה-API secret בהגדרות.</string>
+    <string name="cloud_err_quota">נגמרה המכסה החינמית של Sightengine (יומית או חודשית).</string>
+    <string name="cloud_err_media">Sightengine לא הצליח לקרוא את הקובץ: %1$s</string>
+    <string name="cloud_err_server">שגיאה מ-Sightengine: %1$s</string>
+    <string name="cloud_err_network">אין חיבור ל-Sightengine: %1$s</string>
+    <string name="cloud_err_prepare">לא ניתן היה להכין את הקובץ לשליחה: %1$s</string>
+    <string name="cloud_note">גם שירות ענן יכול לטעות. התוצאה היא חוות דעת נוספת, לא הוכחה.</string>
+    <string name="settings">הגדרות ענן</string>
+    <string name="settings_title">מפתחות Sightengine</string>
+    <string name="settings_body">המפתחות נשמרים מוצפנים בטלפון בלבד (Android Keystore), ונשלחים רק ל-Sightengine כשאתה מאשר בדיקה.</string>
+    <string name="settings_user">API user</string>
+    <string name="settings_secret">API secret</string>
+    <string name="settings_save">שמור</string>
+    <string name="settings_clear">מחק מפתחות</string>
+    <string name="settings_saved">המפתחות נשמרו</string>
+    <string name="settings_cleared">המפתחות נמחקו</string>
+    <string name="settings_has_keys">מפתחות שמורים: API user שמסתיים ב-%1$s</string>
+    <string name="cancel_dialog">ביטול</string>
 </resources>

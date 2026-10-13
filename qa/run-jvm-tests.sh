@@ -20,4 +20,8 @@ run prompt-fields "$SRC/GenerationParameters.kt" "$SRC/PromptFields.kt" qa/Promp
 run report "$SRC/ScanReport.kt" qa/ScanResultStub.kt qa/ScanReportQa.kt
 run url "$SRC/UrlFetcher.kt" "$SRC/XmpFields.kt" qa/UrlFetcherQa.kt
 run exif-text "$SRC/ExifText.kt" qa/ExifTextQa.kt
+python3 qa/clip_vectors.py "$TMPDIR_QA/clip-vectors" >/dev/null
+kotlinc "$SRC/ClipPreprocessor.kt" qa/ClipPreprocessorQa.kt -include-runtime -d "$TMPDIR_QA/clip.jar"
+echo "===== clip-preprocessing ====="
+java -jar "$TMPDIR_QA/clip.jar" "$TMPDIR_QA/clip-vectors"
 echo 'ALL JVM SUITES PASSED'

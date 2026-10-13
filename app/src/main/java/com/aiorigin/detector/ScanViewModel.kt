@@ -23,8 +23,18 @@ import java.util.Locale
 data class ScanUiState(
     val busy: Boolean = false,
     val result: ScanResult? = null,
-    val notice: String? = null
+    val notice: String? = null,
+    /** The scanned media, kept so the user can ask for a cloud check afterwards. */
+    val media: Uri? = null,
+    val cloud: CloudState = CloudState.Idle
 )
+
+sealed class CloudState {
+    data object Idle : CloudState()
+    data object Running : CloudState()
+    data class Done(val outcome: CloudCheck.Outcome) : CloudState()
+    data class Failed(val message: String) : CloudState()
+}
 
 /** Survives rotation and configuration changes, so a running scan and its result are kept. */
 class ScanViewModel(application: Application) : AndroidViewModel(application) {
@@ -36,7 +46,16 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
 
     private class UserFacingException(message: String) : Exception(message)
 
-    fun scan(uri: Uri) = launchScan { Scanner.scan(getApplication(), uri) }
+    private var cloudJob: Job? = null
+    private val secrets by lazy { SecretStore(getApplication()) }
+
+    fun scan(uri: Uri) = launchScan(uri) {
+        // A local scan replaces any earlier downloaded copy.
+        withContext(Dispatchers.IO) { downloadsDir().listFiles()?.forEach { it.delete() } }
+        Scanner.scan(getApplication(), uri)
+    }
+
+    private fun downloadsDir() = File(getApplication<Application>().cacheDir, "downloads")
 
     /** Downloads the linked media (only on user request) and scans the downloaded copy. */
     fun scanUrl(input: String) {
@@ -46,14 +65,16 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(notice = app.getString(R.string.url_invalid)) }
             return
         }
-        launchScan {
-            val dir = File(app.cacheDir, "downloads")
-            val target = File(dir, "media-${System.currentTimeMillis()}")
+        val dir = downloadsDir()
+        val target = File(dir, "media-${System.currentTimeMillis()}")
+        launchScan(Uri.fromFile(target)) {
+            var keep = false
             try {
-                scanDownload(app, url, dir, target)
+                scanDownload(app, url, dir, target).also { keep = true }
             } finally {
-                // Never keep downloaded media around; also removes partial or oversized downloads.
-                withContext(NonCancellable + Dispatchers.IO) { target.delete() }
+                // Partial, oversized or failed downloads are removed at once. A successfully scanned
+                // copy stays in the app cache only until the next scan, for an optional cloud check.
+                if (!keep) withContext(NonCancellable + Dispatchers.IO) { target.delete() }
             }
         }
     }
@@ -82,18 +103,19 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         return Scanner.scan(app, Uri.fromFile(fetched.file), source, fetched.contentType.substringBefore(';').trim())
     }
 
-    private fun launchScan(block: suspend () -> ScanResult) {
+    private fun launchScan(media: Uri, block: suspend () -> ScanResult) {
         val app = getApplication<Application>()
         generation += 1
         val current = generation
         scanJob?.cancel()
         noticeJob?.cancel()
+        cloudJob?.cancel()
         _state.value = ScanUiState(busy = true)
         scanJob = viewModelScope.launch {
             try {
                 val result = block()
                 if (current != generation) return@launch
-                _state.value = ScanUiState(result = result, notice = result.status)
+                _state.value = ScanUiState(result = result, notice = result.status, media = media)
                 noticeJob = viewModelScope.launch {
                     delay(10_000)
                     if (current == generation) _state.update { it.copy(notice = null) }
@@ -118,4 +140,69 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissNotice() = _state.update { it.copy(notice = null) }
+
+    fun hasCloudKeys(): Boolean = secrets.load() != null
+
+    fun cloudKeyHint(): String? = secrets.load()?.user?.takeLast(4)
+
+    fun saveCloudKeys(user: String, secret: String) {
+        secrets.save(SightengineClient.Credentials(user, secret))
+        _state.update { it.copy(notice = getApplication<Application>().getString(R.string.settings_saved)) }
+    }
+
+    fun clearCloudKeys() {
+        secrets.clear()
+        _state.update { it.copy(notice = getApplication<Application>().getString(R.string.settings_cleared)) }
+    }
+
+    /** Called only after the user confirmed the upload in the consent dialog. */
+    fun runCloudCheck(client: SightengineClient = SightengineClient()) {
+        val app = getApplication<Application>()
+        val snapshot = _state.value
+        val media = snapshot.media ?: return
+        val result = snapshot.result ?: return
+        val credentials = secrets.load()
+        if (credentials == null) {
+            _state.update { it.copy(cloud = CloudState.Failed(app.getString(R.string.cloud_no_keys))) }
+            return
+        }
+        val current = generation
+        cloudJob?.cancel()
+        _state.update { it.copy(cloud = CloudState.Running) }
+        cloudJob = viewModelScope.launch {
+            val outcome: CloudState = try {
+                val payloads = try {
+                    runInterruptible(Dispatchers.IO) {
+                        if (result.isVideo) CloudCheck.prepareVideoFrames(app, media)
+                        else listOf(CloudCheck.prepareImage(app, media))
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw IllegalArgumentException(app.getString(R.string.cloud_err_prepare, e.javaClass.simpleName))
+                }
+                val verdicts = runInterruptible(Dispatchers.IO) {
+                    payloads.mapIndexed { i, bytes -> client.checkImage(credentials, bytes, "media-$i.jpg") }
+                }
+                CloudState.Done(CloudCheck.aggregate(verdicts))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: SightengineClient.ApiException) {
+                CloudState.Failed(
+                    when (e.kind) {
+                        SightengineClient.Kind.AUTH -> app.getString(R.string.cloud_err_auth)
+                        SightengineClient.Kind.QUOTA -> app.getString(R.string.cloud_err_quota)
+                        SightengineClient.Kind.BAD_MEDIA -> app.getString(R.string.cloud_err_media, e.message ?: "")
+                        SightengineClient.Kind.SERVER -> app.getString(R.string.cloud_err_server, e.message ?: "")
+                        SightengineClient.Kind.NETWORK -> app.getString(R.string.cloud_err_network, e.message ?: "")
+                    }
+                )
+            } catch (e: IllegalArgumentException) {
+                CloudState.Failed(e.message ?: "")
+            } catch (e: Exception) {
+                CloudState.Failed(app.getString(R.string.cloud_err_server, e.javaClass.simpleName))
+            }
+            if (current == generation) _state.update { it.copy(cloud = outcome) }
+        }
+    }
 }

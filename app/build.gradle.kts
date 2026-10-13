@@ -19,9 +19,15 @@ android {
         applicationId = "com.aiorigin.detector"
         minSdk = 28
         targetSdk = 35
-        versionCode = 22
-        versionName = "0.22.0"
+        versionCode = 23
+        versionName = "0.23.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The phone is arm64; x86_64 is kept only so the CI emulator can run the model.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
+    // The detector model is memory-mapped from a copied file; storing it uncompressed keeps the
+    // APK install fast and lets the asset be opened as a file descriptor.
+    androidResources { noCompress += "onnx" }
     signingConfigs {
         // Fixed, intentionally public debug key (standard Android debug credentials). Without it,
         // every CI run would sign with a new random key and updates on the phone would fail.
@@ -57,4 +63,21 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// The model is not committed; tools/model/fetch-model.sh downloads and verifies it (SHA-256).
+val modelAsset = file("src/main/assets/models/commfor_vit_s384.onnx")
+tasks.named("preBuild") {
+    doFirst {
+        if (!modelAsset.exists()) throw GradleException("Missing ${modelAsset.path}: run tools/model/fetch-model.sh first")
+    }
 }
