@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import okhttp3.mockwebserver.MockResponse
@@ -76,6 +77,29 @@ class AppFlowTest {
             compose.waitUntil(120_000) { compose.onAllNodes(hasTestTag("verdict")).fetchSemanticsNodes().isNotEmpty() }
             compose.onAllNodesWithText(ctx.getString(R.string.v_ai_tool)).onFirst().assertExists()
             compose.onNodeWithTag("visual").performScrollTo().assertIsDisplayed()
+        }
+    }
+
+    @Test fun aiImageGetsLikelyAiHeadline() {
+        share("ai_duckling.jpg").use {
+            compose.waitUntil(120_000) { compose.onAllNodes(hasTestTag("verdict")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onAllNodesWithText(ctx.getString(R.string.v_visual_likely)).onFirst().assertExists()
+        }
+    }
+
+    @Test fun keysEnteredInSettingsAreStoredEncrypted() {
+        SecretStore(ctx).clear()
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            setClassName(ctx, MainActivity::class.java.name)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ActivityScenario.launch<MainActivity>(intent).use {
+            compose.onNodeWithTag("settings").performClick()
+            compose.onNodeWithTag("key_user").performTextInput("typed-user-1234")
+            compose.onNodeWithTag("key_secret").performTextInput("typed-secret")
+            compose.onNodeWithTag("key_save").performClick()
+            compose.waitForIdle()
+            assertEquals(SightengineClient.Credentials("typed-user-1234", "typed-secret"), SecretStore(ctx).load())
         }
     }
 }

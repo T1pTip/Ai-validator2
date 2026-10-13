@@ -1,5 +1,13 @@
 [
  {
+  "file": "ai_duckling.jpg",
+  "width": 1024,
+  "height": 1024,
+  "rgbSha256": "83e464911f72b8ee42cdd6903b8b212fa5e44810d06e32769bfe37747c94bcb0",
+  "logit": 4.808969,
+  "probability": 0.99191
+ },
+ {
   "file": "qa_a1111.png",
   "width": 512,
   "height": 384,
