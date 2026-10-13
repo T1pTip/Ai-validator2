@@ -71,6 +71,12 @@ jobs:
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/debug/*.txt
           if-no-files-found: error
+      - name: Upload instrumentation test APK (for running the suite on the real phone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-origin-androidtest-apk
+          path: app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: error
 
   # Instrumentation tests on an Android 15 emulator: model goldens, end-to-end scans of the
   # device-QA fixtures, the Sightengine client against a local mock server, and the share flow UI.
