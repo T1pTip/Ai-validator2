@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">גלאי מקור AI</string>
     <string name="app_title">גלאי מקור AI</string>
-    <string name="subtitle">סריקה מקומית בטלפון · בלי העלאה לענן</string>
+    <string name="subtitle">סריקה מקומית בטלפון · שום קובץ לא עולה לענן</string>
     <string name="device_line">%1$s · זיכרון פנוי %2$s מתוך %3$s GB · %4$d ליבות · חום: %5$s</string>
     <string name="mode_line">מצב עיבוד מומלץ: %1$s</string>
     <string name="mode_performance">ביצועים</string>
@@ -27,6 +27,16 @@
     <string name="x_description">יש בקובץ תיאור טקסטואלי, אבל אין בו סימן ליצירה ב-AI.</string>
     <string name="x_unknown">רוב האתרים והאפליקציות מוחקים מטא-דאטה, ולכן היעדר סימנים לא מוכיח שהתמונה אמיתית. בדיקה חזותית תתווסף בשלב הבא.</string>
 
+    <string name="url_label">או הדבק קישור לתמונה, סרטון או פוסט</string>
+    <string name="url_check">בדוק</string>
+    <string name="url_invalid">הקישור לא תקין</string>
+    <string name="url_not_media">הקישור לא מוביל לתמונה או לסרטון, וגם לא נמצאה בעמוד מדיה ראשית</string>
+    <string name="url_too_big">הקובץ בקישור גדול מדי (מעל 200MB)</string>
+    <string name="url_failed">ההורדה נכשלה: %1$s</string>
+    <string name="e_url_source">הקובץ הורד מ-%1$s (%2$s, %3$s). אתרים מוחקים לעיתים קרובות מטא-דאטה מהעותק שהם מגישים.</string>
+    <string name="e_url_page">הקישור הוביל לעמוד אינטרנט, והמדיה הראשית שלו נלקחה לבדיקה (og:image / og:video)</string>
+    <string name="s_description">תיאור שמוטמע בקובץ</string>
+    <string name="description_note">זה טקסט תיאורי מהמטא-דאטה, לא הפרומפט שיצר את התמונה.</string>
     <string name="s_prompt">פרומפט שנמצא בקובץ</string>
     <string name="s_negative">פרומפט שלילי</string>
     <string name="s_settings">הגדרות יצירה</string>

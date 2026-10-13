@@ -19,7 +19,9 @@ data class ScanResult(
     val settings: Map<String, String> = emptyMap(),
     val level: OriginLevel = OriginLevel.UNKNOWN,
     val explanation: String = "",
-    val isVideo: Boolean = false
+    val isVideo: Boolean = false,
+    /** Embedded description/comment. Shown separately and never presented as a prompt. */
+    val description: String? = null
 )
 
 /**
@@ -29,7 +31,7 @@ data class ScanResult(
 object Scanner {
     private class MetadataOutcome(val metadata: Map<String, String>, val evidence: List<String>)
 
-    suspend fun scan(context: Context, uri: Uri): ScanResult = coroutineScope {
+    suspend fun scan(context: Context, uri: Uri, sourceEvidence: List<String> = emptyList()): ScanResult = coroutineScope {
         val type = context.contentResolver.getType(uri) ?: ""
         val header = runInterruptible(Dispatchers.IO) { readHeader(context, uri, 16) }
         val isVideo = type.startsWith("video/") || (!type.startsWith("image/") && isVideoContainer(header))
@@ -40,7 +42,7 @@ object Scanner {
         }
         val frames = if (isVideo) async(Dispatchers.IO) { runInterruptible { videoFrames(context, uri) } } else null
 
-        val evidence = mutableListOf<String>()
+        val evidence = sourceEvidence.toMutableList()
         evidence.add(fingerprint.await())
         val meta = metadata.await()
         evidence.addAll(meta.evidence)
@@ -92,7 +94,8 @@ object Scanner {
             settings = shownSettings,
             level = assessment.level,
             explanation = context.getString(explanation),
-            isVideo = isVideo
+            isVideo = isVideo,
+            description = MetadataAssessor.description(metadata)?.takeIf { it != fields.positive }
         )
     }
 

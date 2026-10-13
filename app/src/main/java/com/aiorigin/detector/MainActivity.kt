@@ -17,7 +17,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,7 +67,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         // Only the first creation handles a share intent; rotation must not rescan.
-        if (savedInstanceState == null) sharedUri(intent)?.let { viewModel.scan(it) }
+        if (savedInstanceState == null) handleShare(intent)
         setContent {
             MaterialTheme(colorScheme = DarkColors) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -72,7 +79,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        sharedUri(intent)?.let { viewModel.scan(it) }
+        handleShare(intent)
+    }
+
+    /** A shared image/video is scanned directly; a shared link (e.g. from a browser) is downloaded first. */
+    private fun handleShare(intent: Intent?) {
+        sharedUri(intent)?.let { viewModel.scan(it); return }
+        if (intent?.action == Intent.ACTION_SEND) {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let { viewModel.scanUrl(it) }
+        }
     }
 
     private fun sharedUri(intent: Intent?): Uri? {
@@ -104,6 +119,7 @@ private fun AppScreen(viewModel: ScanViewModel) {
                 enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
             ) { Text(stringResource(R.string.choose), style = MaterialTheme.typography.titleMedium) }
+            UrlInput(enabled = !state.busy, onSubmit = viewModel::scanUrl)
             if (state.busy) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
@@ -119,6 +135,31 @@ private fun AppScreen(viewModel: ScanViewModel) {
             }
             state.result?.let { ResultView(it) }
         }
+    }
+}
+
+@Composable
+private fun UrlInput(enabled: Boolean, onSubmit: (String) -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val focus = LocalFocusManager.current
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            enabled = enabled,
+            label = { Text(stringResource(R.string.url_label)) },
+            placeholder = { Text("https://…") },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { focus.clearFocus(); onSubmit(text) })
+        )
+        FilledTonalButton(
+            onClick = { focus.clearFocus(); onSubmit(text) },
+            enabled = enabled && text.isNotBlank(),
+            modifier = Modifier.heightIn(min = 56.dp)
+        ) { Text(stringResource(R.string.url_check)) }
     }
 }
 
@@ -169,6 +210,13 @@ private fun ResultView(r: ScanResult) {
     if (r.settings.isNotEmpty()) {
         Section(stringResource(R.string.s_settings)) {
             r.settings.forEach { (k, v) -> Text("$k: $v", style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+    r.description?.let { d ->
+        Section(stringResource(R.string.s_description)) {
+            SelectionContainer { Text(d, style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.description_note), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     Section(stringResource(R.string.s_evidence)) {

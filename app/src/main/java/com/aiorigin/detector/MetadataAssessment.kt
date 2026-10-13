@@ -47,6 +47,22 @@ object MetadataAssessor {
     private val declaredGenerated = Regex("(?<!compositewith)trainedalgorithmicmedia", RegexOption.IGNORE_CASE)
     private val declaredEdited = Regex("compositewithtrainedalgorithmicmedia", RegexOption.IGNORE_CASE)
 
+    /** ComfyUI stores its node graph as JSON without naming itself; recognise the node structure. */
+    private val comfyNodes = listOf("\"KSampler", "\"CLIPTextEncode\"", "\"CheckpointLoaderSimple\"", "\"VAEDecode\"", "\"SamplerCustom")
+    private fun isComfyGraph(value: String): Boolean {
+        val trimmed = value.trimStart()
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return false
+        val head = value.take(500_000)
+        return head.contains("\"class_type\"") && comfyNodes.any { head.contains(it) } ||
+            head.contains("\"nodes\"") && head.contains("\"links\"") && comfyNodes.any { head.contains(it) }
+    }
+
+    /** First generic description/comment, for display only — never presented as a prompt. */
+    fun description(metadata: Map<String, String>): String? = metadata.entries.firstOrNull { (key, value) ->
+        weakKeys.any { key.lowercase().contains(it) } && value.isNotBlank() && !value.trimStart().startsWith("{") &&
+            GenerationParametersParser.parse(value) == null
+    }?.value?.trim()?.take(2_000)
+
     fun assess(metadata: Map<String, String>): MetadataAssessment {
         val indicators = mutableListOf<String>()
         val software = metadata.entries.firstOrNull { it.key.contains("software", true) }?.value
@@ -55,7 +71,7 @@ object MetadataAssessor {
             generationTools.firstOrNull { value.contains(it, ignoreCase = true) }
         } ?: softwareValues.firstNotNullOfOrNull { value ->
             softwareOnlyTools.firstOrNull { value.contains(it, ignoreCase = true) }
-        }
+        } ?: if (metadata.values.any(::isComfyGraph)) "ComfyUI" else null
         val c2paPresent = metadata["c2pa.present"] == "true"
         val c2paGenerator = metadata["c2pa.generator"]
         val generated = metadata.values.any { declaredGenerated.containsMatchIn(it) }

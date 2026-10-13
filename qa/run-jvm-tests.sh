@@ -18,4 +18,5 @@ run jpeg "$SRC/JpegMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" 
 run webp "$SRC/WebpMetadataReader.kt" "$SRC/XmpFields.kt" "$SRC/C2paSniffer.kt" qa/WebpMetadataQa.kt
 run prompt-fields "$SRC/GenerationParameters.kt" "$SRC/PromptFields.kt" qa/PromptFieldsQa.kt
 run report "$SRC/ScanReport.kt" qa/ScanResultStub.kt qa/ScanReportQa.kt
+run url "$SRC/UrlFetcher.kt" "$SRC/XmpFields.kt" qa/UrlFetcherQa.kt
 echo 'ALL JVM SUITES PASSED'

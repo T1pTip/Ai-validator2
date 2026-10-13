@@ -41,4 +41,10 @@ fun main() {
     checkCase("C2PA generator ChatGPT", mapOf("c2pa.present" to "true", "c2pa.generator" to "ChatGPT"),
         "AI creation metadata found (unverified)")
     checkCase("C2PA from a camera only", mapOf("c2pa.present" to "true", "c2pa.generator" to "Samsung Camera"), "Origin unknown")
+    val comfy = """{"3":{"class_type":"KSampler","inputs":{"positive":["6",0]}},"6":{"class_type":"CLIPTextEncode","inputs":{"text":"a cat"}}}"""
+    checkCase("ComfyUI graph without the word ComfyUI", mapOf("prompt" to comfy), "AI creation metadata found (unverified)")
+    check(MetadataAssessor.assess(mapOf("prompt" to comfy)).tool == "ComfyUI"); println("PASS: ComfyUI tool name")
+    checkCase("ordinary JSON is not ComfyUI", mapOf("comment" to """{"class_type":"photo"}"""), "Description found; origin unknown")
+    check(MetadataAssessor.description(mapOf("ImageDescription" to " a red fox ")) == "a red fox"); println("PASS: description shown")
+    check(MetadataAssessor.description(mapOf("UserComment" to "x\nSteps: 20, Seed: 1")) == null); println("PASS: A1111 text is not a description")
 }
