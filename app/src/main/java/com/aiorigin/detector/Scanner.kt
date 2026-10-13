@@ -70,7 +70,10 @@ object Scanner {
         val fields = PromptFieldsResolver.resolve(metadata, extracted)
         fields.negative?.let { evidence.add(context.getString(R.string.e_negative_len, it.length)) }
 
-        val (title, explanation) = when (assessment.level) {
+        // A manifest without an AI declaration is still a finding; don't headline it as "no signs found".
+        val c2paOnly = assessment.c2paPresent &&
+            (assessment.level == OriginLevel.UNKNOWN || assessment.level == OriginLevel.DESCRIPTION)
+        val (title, explanation) = if (c2paOnly) R.string.v_c2pa_only to R.string.x_c2pa_only else when (assessment.level) {
             OriginLevel.AI_DECLARED -> R.string.v_ai_declared to R.string.x_declared
             OriginLevel.AI_EDITED -> R.string.v_ai_edited to R.string.x_edited
             OriginLevel.AI_TOOL -> R.string.v_ai_tool to R.string.x_tool
