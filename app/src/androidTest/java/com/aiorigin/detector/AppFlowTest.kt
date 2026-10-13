@@ -1,6 +1,7 @@
 package com.aiorigin.detector
 
 import android.content.Intent
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -30,7 +31,10 @@ class AppFlowTest {
     private lateinit var server: MockWebServer
     private val ctx = TestFiles.target
 
+    private lateinit var saved: TestFiles.SavedSecrets
+
     @Before fun setUp() {
+        saved = TestFiles.SavedSecrets()
         server = MockWebServer().apply { start() }
         SightengineClient.endpoint = server.url("/").toString().trimEnd('/')
         SecretStore(ctx).save(SightengineClient.Credentials("flow-user", "flow-secret"))
@@ -38,7 +42,8 @@ class AppFlowTest {
 
     @After fun tearDown() {
         SightengineClient.endpoint = SightengineClient.DEFAULT_BASE
-        SecretStore(ctx).clear()
+        GeminiClient.endpoint = GeminiClient.DEFAULT_BASE
+        saved.restore()
         server.shutdown()
     }
 
@@ -117,6 +122,47 @@ class AppFlowTest {
             compose.onNodeWithText(ctx.getString(R.string.cloud_err_auth)).assertExists()
             compose.onNodeWithText(ctx.getString(R.string.cloud_fix_keys)).performScrollTo().performClick()
             compose.onNodeWithTag("key_user").assertExists()
+        }
+    }
+
+    @Test fun rebuiltPromptAndGeminiSecondOpinion() {
+        // The local description model must be on the device (FlorenceCaptionerTest downloads it too).
+        if (!ModelDownloader.isReady(ctx)) ModelDownloader.download(ctx) { _, _ -> }
+        GeminiClient.endpoint = server.url("/").toString().trimEnd('/')
+        SecretStore(ctx).saveGemini("gem-key-123")
+        server.enqueue(MockResponse().setBody("""{"models":[{"name":"models/gemini-3.6-flash","supportedGenerationMethods":["generateContent"]},
+            {"name":"models/gemini-3.8-flash","supportedGenerationMethods":["generateContent"]}]}"""))
+        server.enqueue(MockResponse().setBody("""{"candidates":[{"content":{"parts":[{"text":"```json\n{\"prompt\": \"fluffy yellow duckling in clover, golden hour\", \"negative_prompt\": null, \"generator_guess\": \"Flux\", \"found_online\": null, \"notes\": \"בדיקה\"}\n```"}]},
+            "groundingMetadata":{"groundingChunks":[{"web":{"uri":"https://example.com/x","title":"example.com"}}]}}]}"""))
+        share("ai_duckling.jpg").use {
+            compose.waitUntil(180_000) { compose.onAllNodes(hasTestTag("rebuilt_prompt")).fetchSemanticsNodes().isNotEmpty() }
+            val text = compose.onNodeWithTag("rebuilt_prompt").fetchSemanticsNode().config
+                .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
+            assertTrue("local prompt mentions the duck: $text", text.contains("duck", ignoreCase = true))
+            compose.onNodeWithTag("gemini_button").performScrollTo().performClick()
+            assertEquals(0, server.requestCount)
+            compose.onNodeWithTag("gemini_confirm").performClick()
+            compose.waitUntil(60_000) { compose.onAllNodes(hasTestTag("gemini_prompt")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("fluffy yellow duckling in clover, golden hour").assertExists()
+            val list = server.takeRequest()
+            assertEquals("gem-key-123", list.getHeader("x-goog-api-key"))
+            assertTrue("key not in URL", !list.path!!.contains("gem-key"))
+            val gen = server.takeRequest()
+            assertEquals("/v1beta/models/gemini-3.8-flash:generateContent", gen.path)
+            val body = gen.body.readUtf8()
+            assertTrue(body.contains("inline_data") && body.contains("google_search") && body.contains("duck", ignoreCase = true))
+        }
+    }
+
+    @Test fun geminiAsksForKeyFirst() {
+        SecretStore(ctx).clearGemini()
+        share("street.png").use {
+            compose.waitUntil(120_000) { compose.onAllNodes(hasTestTag("gemini_button")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("gemini_button").performScrollTo().performClick()
+            compose.onNodeWithTag("gemini_key").performTextInput("typed-gemini")
+            compose.onNodeWithTag("gemini_key_save").performClick()
+            assertEquals("typed-gemini", SecretStore(ctx).loadGemini())
+            compose.onNodeWithTag("gemini_confirm").assertExists()
         }
     }
 }

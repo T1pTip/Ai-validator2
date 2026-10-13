@@ -26,8 +26,28 @@ data class ScanUiState(
     val notice: String? = null,
     /** The scanned media, kept so the user can ask for a cloud check afterwards. */
     val media: Uri? = null,
-    val cloud: CloudState = CloudState.Idle
+    val cloud: CloudState = CloudState.Idle,
+    val prompt: PromptState = PromptState.Idle,
+    val gemini: GeminiState = GeminiState.Idle
 )
+
+/** Local prompt reconstruction (Florence-2 description -> prompt). */
+sealed class PromptState {
+    data object Idle : PromptState()
+    /** The description model is not on the phone yet; it is downloaded only when the user asks. */
+    data object NeedsModel : PromptState()
+    data class Downloading(val done: Long, val total: Long) : PromptState()
+    data object Generating : PromptState()
+    data class Ready(val caption: String, val width: Int, val height: Int, val millis: Long) : PromptState()
+    data class Failed(val message: String) : PromptState()
+}
+
+sealed class GeminiState {
+    data object Idle : GeminiState()
+    data object Running : GeminiState()
+    data class Done(val result: GeminiClient.Result) : GeminiState()
+    data class Failed(val message: String, val keysProblem: Boolean = false) : GeminiState()
+}
 
 sealed class CloudState {
     data object Idle : CloudState()
@@ -110,12 +130,19 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         scanJob?.cancel()
         noticeJob?.cancel()
         cloudJob?.cancel()
+        promptJob?.cancel()
+        geminiJob?.cancel()
         _state.value = ScanUiState(busy = true)
         scanJob = viewModelScope.launch {
             try {
                 val result = block()
                 if (current != generation) return@launch
                 _state.value = ScanUiState(result = result, notice = result.status, media = media)
+                // No prompt in the file: describe the image locally if the model is already here.
+                if (result.prompt == null) {
+                    if (ModelDownloader.isReady(app)) startPrompt(download = false)
+                    else _state.update { it.copy(prompt = PromptState.NeedsModel) }
+                }
                 noticeJob = viewModelScope.launch {
                     delay(10_000)
                     if (current == generation) _state.update { it.copy(notice = null) }
@@ -204,6 +231,95 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
                 CloudState.Failed(app.getString(R.string.cloud_err_server, e.javaClass.simpleName))
             }
             finishCloud(current, outcome)
+        }
+    }
+
+    private var promptJob: Job? = null
+    private var geminiJob: Job? = null
+
+    /** Local description -> prompt. [download] is true when the user asked to fetch the model. */
+    fun startPrompt(download: Boolean) {
+        val app = getApplication<Application>()
+        val snapshot = _state.value
+        val media = snapshot.media ?: return
+        val result = snapshot.result ?: return
+        val current = generation
+        promptJob?.cancel()
+        promptJob = viewModelScope.launch {
+            val outcome: PromptState = try {
+                if (!ModelDownloader.isReady(app)) {
+                    if (!download) return@launch
+                    _state.update { it.copy(prompt = PromptState.Downloading(0, ModelDownloader.TOTAL_BYTES)) }
+                    var lastUpdate = 0L
+                    runInterruptible(Dispatchers.IO) {
+                        ModelDownloader.download(app) { done, total ->
+                            val now = System.currentTimeMillis()
+                            if (now - lastUpdate > 300 || done == total) {
+                                lastUpdate = now
+                                if (current == generation) _state.update { it.copy(prompt = PromptState.Downloading(done, total)) }
+                            }
+                        }
+                    }
+                }
+                _state.update { it.copy(prompt = PromptState.Generating) }
+                runInterruptible(Dispatchers.Default) {
+                    val bitmap = (if (result.isVideo) CloudCheck.middleFrame(app, media) else LocalDetector.decode(app, media))
+                        ?: throw IllegalArgumentException("undecodable")
+                    try {
+                        val caption = FlorenceCaptioner.caption(app, LocalDetector.pixels(bitmap), bitmap.width, bitmap.height)
+                        PromptState.Ready(caption.text, bitmap.width, bitmap.height, caption.millis)
+                    } finally { bitmap.recycle() }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                PromptState.Failed(app.getString(R.string.prompt_failed, e.message ?: e.javaClass.simpleName))
+            }
+            if (current == generation) _state.update { it.copy(prompt = outcome) }
+        }
+    }
+
+    fun hasGeminiKey(): Boolean = secrets.loadGemini() != null
+
+    fun saveGeminiKey(key: String) {
+        secrets.saveGemini(key)
+        _state.update { it.copy(notice = getApplication<Application>().getString(R.string.settings_saved)) }
+    }
+
+    /** Called only after the user confirmed sending the image to Gemini. */
+    fun runGemini(target: PromptTarget, client: GeminiClient = GeminiClient()) {
+        val app = getApplication<Application>()
+        val snapshot = _state.value
+        val media = snapshot.media ?: return
+        val result = snapshot.result ?: return
+        val key = secrets.loadGemini()
+        if (key == null) {
+            _state.update { it.copy(gemini = GeminiState.Failed(app.getString(R.string.gemini_no_key), keysProblem = true)) }
+            return
+        }
+        val caption = (snapshot.prompt as? PromptState.Ready)?.caption
+        val generator = (snapshot.cloud as? CloudState.Done)?.outcome?.topGenerator?.takeIf { it.second >= 0.3f }?.first
+            ?: result.generatorHints.firstOrNull()
+        val current = generation
+        geminiJob?.cancel()
+        _state.update { it.copy(gemini = GeminiState.Running) }
+        geminiJob = viewModelScope.launch {
+            val outcome: GeminiState = try {
+                val jpeg = runInterruptible(Dispatchers.IO) { CloudCheck.jpegForGemini(app, media, result.isVideo) }
+                GeminiState.Done(runInterruptible(Dispatchers.IO) { client.reconstruct(key, jpeg, caption, generator, target) })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: GeminiClient.ApiException) {
+                when (e.kind) {
+                    GeminiClient.Kind.AUTH -> GeminiState.Failed(app.getString(R.string.gemini_err_auth), keysProblem = true)
+                    GeminiClient.Kind.QUOTA -> GeminiState.Failed(app.getString(R.string.gemini_err_quota))
+                    GeminiClient.Kind.NETWORK -> GeminiState.Failed(app.getString(R.string.cloud_err_network, e.message ?: ""))
+                    else -> GeminiState.Failed(app.getString(R.string.gemini_err, e.message ?: ""))
+                }
+            } catch (e: Exception) {
+                GeminiState.Failed(app.getString(R.string.gemini_err, e.javaClass.simpleName))
+            }
+            if (current == generation) _state.update { it.copy(gemini = outcome) }
         }
     }
 

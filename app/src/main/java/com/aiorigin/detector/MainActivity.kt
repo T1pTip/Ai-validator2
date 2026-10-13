@@ -191,6 +191,7 @@ private fun ResultView(r: ScanResult, state: ScanUiState, viewModel: ScanViewMod
         }
     }
     CloudSection(r, state, viewModel)
+    if (r.prompt == null) RebuiltPromptSection(r, state, viewModel)
     r.prompt?.let { PromptCard(stringResource(R.string.s_prompt), it, stringResource(R.string.copy_prompt), context) }
     r.negativePrompt?.let { PromptCard(stringResource(R.string.s_negative), it, stringResource(R.string.copy_negative), context) }
     Text(stringResource(R.string.s_source, r.source), style = MaterialTheme.typography.bodySmall,
@@ -347,6 +348,134 @@ private fun SettingsDialog(viewModel: ScanViewModel, message: String? = null, on
                 enabled = user.isNotBlank() && secret.isNotBlank(),
                 modifier = Modifier.testTag("key_save")
             ) { Text(stringResource(R.string.settings_save)) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel_dialog)) } }
+    )
+}
+
+@Composable
+private fun RebuiltPromptSection(r: ScanResult, state: ScanUiState, viewModel: ScanViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val cloudGenerator = (state.cloud as? CloudState.Done)?.outcome?.topGenerator?.takeIf { it.second >= 0.3f }?.first
+    val target = PromptBuilder.targetFor(listOfNotNull(cloudGenerator) + r.generatorHints)
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    var needKey by rememberSaveable { mutableStateOf(false) }
+    Section(stringResource(R.string.s_rebuilt)) {
+        when (val p = state.prompt) {
+            PromptState.Idle -> {}
+            PromptState.NeedsModel -> OutlinedButton(onClick = { viewModel.startPrompt(download = true) },
+                modifier = Modifier.fillMaxWidth().testTag("prompt_download")) {
+                Text(stringResource(R.string.prompt_download, (ModelDownloader.TOTAL_BYTES / 1_000_000).toInt()))
+            }
+            is PromptState.Downloading -> {
+                val pct = if (p.total > 0) (p.done * 100 / p.total).toInt() else 0
+                Text(stringResource(R.string.prompt_downloading, pct))
+                LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.fillMaxWidth())
+            }
+            PromptState.Generating -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.prompt_generating))
+            }
+            is PromptState.Ready -> {
+                val built = PromptBuilder.build(p.caption, target, p.width, p.height)
+                Text(stringResource(R.string.prompt_target, built.target.label), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary)
+                SelectionContainer { Text(built.prompt, Modifier.testTag("rebuilt_prompt"), style = MaterialTheme.typography.bodyMedium) }
+                built.negative?.let { Text(stringResource(R.string.gemini_negative, it), style = MaterialTheme.typography.bodySmall) }
+                CopyButton(built.prompt + (built.negative?.let { "\nNegative prompt: $it" } ?: ""), context)
+                Text(stringResource(R.string.prompt_local_note), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            is PromptState.Failed -> {
+                Text(p.message, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { viewModel.startPrompt(download = true) }) { Text(stringResource(R.string.prompt_retry)) }
+            }
+        }
+        when (val g = state.gemini) {
+            GeminiState.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.gemini_running))
+            }
+            is GeminiState.Done -> {
+                val res = g.result
+                HorizontalDivider()
+                Text(stringResource(R.string.gemini_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                if (res.foundPrompt != null) {
+                    Text(stringResource(R.string.gemini_found), fontWeight = FontWeight.SemiBold, color = OnSignal)
+                    SelectionContainer { Text(res.foundPrompt, style = MaterialTheme.typography.bodyMedium) }
+                    res.foundUrl?.let { Text(stringResource(R.string.gemini_found_source, it), style = MaterialTheme.typography.bodySmall) }
+                    CopyButton(res.foundPrompt, context)
+                }
+                SelectionContainer { Text(res.prompt, Modifier.testTag("gemini_prompt"), style = MaterialTheme.typography.bodyMedium) }
+                res.negativePrompt?.let { Text(stringResource(R.string.gemini_negative, it), style = MaterialTheme.typography.bodySmall) }
+                CopyButton(res.prompt + (res.negativePrompt?.let { "\nNegative prompt: $it" } ?: ""), context)
+                res.generatorGuess?.let { Text(stringResource(R.string.gemini_generator, it), style = MaterialTheme.typography.bodySmall) }
+                res.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (res.sources.isNotEmpty()) Text(stringResource(R.string.gemini_sources, res.sources.joinToString(" · ")),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!res.grounded) Text(stringResource(R.string.gemini_ungrounded), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.gemini_model, res.model.removePrefix("models/")), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            is GeminiState.Failed -> {
+                Text(g.message, Modifier.testTag("gemini_error"), color = MaterialTheme.colorScheme.error)
+                if (g.keysProblem) TextButton(onClick = { needKey = true }) { Text(stringResource(R.string.cloud_fix_keys)) }
+            }
+            GeminiState.Idle -> {}
+        }
+        if (state.gemini != GeminiState.Running && state.media != null) {
+            OutlinedButton(
+                onClick = { if (viewModel.hasGeminiKey()) confirm = true else needKey = true },
+                modifier = Modifier.fillMaxWidth().testTag("gemini_button")
+            ) { Text(stringResource(R.string.gemini_button)) }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.gemini_consent_title)) },
+            text = { Text(stringResource(R.string.gemini_consent)) },
+            confirmButton = {
+                TextButton(onClick = { confirm = false; viewModel.runGemini(target) }, modifier = Modifier.testTag("gemini_confirm")) {
+                    Text(stringResource(R.string.cloud_send))
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel_dialog)) } }
+        )
+    }
+    if (needKey) GeminiKeyDialog(viewModel, onSaved = { confirm = true }) { needKey = false }
+}
+
+@Composable
+private fun CopyButton(text: String, context: Context) {
+    val copied = stringResource(R.string.copied)
+    TextButton(onClick = {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("prompt", text))
+        if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+    }) { Text(stringResource(R.string.copy)) }
+}
+
+@Composable
+private fun GeminiKeyDialog(viewModel: ScanViewModel, onSaved: () -> Unit, onClose: () -> Unit) {
+    var key by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(stringResource(R.string.gemini_key_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.gemini_key_body), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(key, { key = it }, singleLine = true, label = { Text(stringResource(R.string.gemini_key_label)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
+                    modifier = Modifier.testTag("gemini_key"))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { viewModel.saveGeminiKey(key); onClose(); onSaved() }, enabled = key.isNotBlank(),
+                modifier = Modifier.testTag("gemini_key_save")) { Text(stringResource(R.string.settings_save)) }
         },
         dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel_dialog)) } }
     )

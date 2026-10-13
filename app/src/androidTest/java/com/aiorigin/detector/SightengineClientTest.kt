@@ -17,8 +17,9 @@ class SightengineClientTest {
     private lateinit var server: MockWebServer
     private val creds = SightengineClient.Credentials("user123", "s3cret-value")
 
-    @Before fun start() { server = MockWebServer().apply { start() } }
-    @After fun stop() { server.shutdown() }
+    private lateinit var saved: TestFiles.SavedSecrets
+    @Before fun start() { saved = TestFiles.SavedSecrets(); server = MockWebServer().apply { start() } }
+    @After fun stop() { server.shutdown(); saved.restore() }
 
     private fun client() = SightengineClient(server.url("/").toString().trimEnd('/'))
 

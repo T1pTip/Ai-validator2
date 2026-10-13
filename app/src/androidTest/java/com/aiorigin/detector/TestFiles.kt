@@ -18,4 +18,15 @@ object TestFiles {
     }
 
     fun asset(path: String): String = testContext.assets.open(path).use { it.readBytes().decodeToString() }
+
+    /** Keys the user typed on the phone survive a test run: saved before each test, restored after. */
+    class SavedSecrets {
+        private val store = SecretStore(target)
+        private val sightengine = store.load()
+        private val gemini = store.loadGemini()
+        fun restore() {
+            if (sightengine != null) store.save(sightengine) else store.clear()
+            if (gemini != null) store.saveGemini(gemini) else store.clearGemini()
+        }
+    }
 }

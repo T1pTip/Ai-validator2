@@ -128,4 +128,35 @@
     <string name="settings_cleared">המפתחות נמחקו</string>
     <string name="settings_has_keys">מפתחות שמורים: API user שמסתיים ב-%1$s</string>
     <string name="cancel_dialog">ביטול</string>
+
+    <!-- Stage 3: prompt reconstruction -->
+    <string name="s_rebuilt">פרומפט משוחזר</string>
+    <string name="prompt_target">בפורמט של %1$s</string>
+    <string name="prompt_local_note">נבנה מתיאור של מודל שרץ בטלפון (Florence-2). זה הפרומפט הקרוב ביותר שאפשר לבנות, לא הפרומפט המקורי.</string>
+    <string name="prompt_caption">תיאור התמונה: %1$s</string>
+    <string name="prompt_download">צור פרומפט (הורדה חד-פעמית של מודל, %1$d MB)</string>
+    <string name="prompt_downloading">מוריד את מודל התיאור: %1$d%%</string>
+    <string name="prompt_generating">מתאר את התמונה…</string>
+    <string name="prompt_failed">יצירת הפרומפט נכשלה: %1$s</string>
+    <string name="prompt_retry">נסה שוב</string>
+    <string name="copy">העתק</string>
+    <string name="gemini_button">שפר עם Gemini</string>
+    <string name="gemini_running">Gemini מנתח ומחפש ברשת…</string>
+    <string name="gemini_consent_title">לשלוח ל-Gemini?</string>
+    <string name="gemini_consent">התמונה תישלח ל-Google Gemini לניתוח ולחיפוש הפרומפט ברשת. במסלול החינמי, לפי תנאי Google, מה שנשלח עשוי לשמש לשיפור המוצרים שלהם ולהיבדק על ידי בודקים אנושיים. אל תשלח תמונות פרטיות. להמשיך?</string>
+    <string name="gemini_title">פרומפט מ-Gemini</string>
+    <string name="gemini_negative">פרומפט שלילי: %1$s</string>
+    <string name="gemini_generator">מחולל משוער: %1$s</string>
+    <string name="gemini_found">נמצא ברשת פרומפט שנראה מקורי:</string>
+    <string name="gemini_found_source">מקור: %1$s</string>
+    <string name="gemini_sources">מקורות שנבדקו: %1$s</string>
+    <string name="gemini_model">מודל: %1$s</string>
+    <string name="gemini_ungrounded">החיפוש ברשת לא היה זמין, אז הפרומפט נבנה מהתמונה בלבד.</string>
+    <string name="gemini_no_key">צריך להזין מפתח Gemini לפני השימוש.</string>
+    <string name="gemini_err_auth">Google דחה את מפתח ה-Gemini. בדוק את המפתח.</string>
+    <string name="gemini_err_quota">נגמרה המכסה החינמית של Gemini להיום.</string>
+    <string name="gemini_err">שגיאה מ-Gemini: %1$s</string>
+    <string name="gemini_key_title">מפתח Gemini</string>
+    <string name="gemini_key_body">המפתח נשמר מוצפן בטלפון בלבד (Android Keystore), ונשלח רק ל-Google כשאתה מאשר בקשה.</string>
+    <string name="gemini_key_label">Gemini API key</string>
 </resources>

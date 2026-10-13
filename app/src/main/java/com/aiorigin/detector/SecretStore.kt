@@ -32,7 +32,18 @@ class SecretStore(context: Context) {
         null
     }
 
-    fun clear() = prefs.edit().clear().apply()
+    /** Removes the Sightengine keys only. */
+    fun clear() = prefs.edit().remove("se_user").remove("se_secret").apply()
+
+    fun saveGemini(apiKey: String) = prefs.edit().putString("gemini_key", encrypt(apiKey.trim())).apply()
+
+    fun loadGemini(): String? = try {
+        prefs.getString("gemini_key", null)?.let(::decrypt)?.takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
+    }
+
+    fun clearGemini() = prefs.edit().remove("gemini_key").apply()
 
     private fun key(): SecretKey {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

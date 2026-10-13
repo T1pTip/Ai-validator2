@@ -24,4 +24,7 @@ python3 qa/clip_vectors.py "$TMPDIR_QA/clip-vectors" >/dev/null
 kotlinc "$SRC/ClipPreprocessor.kt" qa/ClipPreprocessorQa.kt -include-runtime -d "$TMPDIR_QA/clip.jar"
 echo "===== clip-preprocessing ====="
 java -jar "$TMPDIR_QA/clip.jar" "$TMPDIR_QA/clip-vectors"
+kotlinc "$SRC/ClipPreprocessor.kt" "$SRC/FlorenceText.kt" "$SRC/PromptBuilder.kt" qa/FlorenceQa.kt -include-runtime -d "$TMPDIR_QA/florence.jar"
+echo "===== florence-prompt ====="
+java -jar "$TMPDIR_QA/florence.jar" "$TMPDIR_QA/clip-vectors"
 echo 'ALL JVM SUITES PASSED'

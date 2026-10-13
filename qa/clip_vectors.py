@@ -14,6 +14,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "model"))
 import clip_reference as ref  # noqa: E402
+import florence_reference as florence  # noqa: E402
 
 
 def synthetic(w, h, seed):
@@ -44,6 +45,7 @@ def main(out):
         img.save(os.path.join(out, name + ".png"))
         np.asarray(ref.resize(img), dtype=np.uint8).tofile(os.path.join(out, name + ".resized.rgb"))
         ref.to_tensor(img).astype("<f4").tofile(os.path.join(out, name + ".tensor.f32"))
+        florence.pixel_values(img).astype("<f4").tofile(os.path.join(out, name + ".florence.f32"))
         print(name, img.size, "->", ref.resized_size(*img.size))
 
 

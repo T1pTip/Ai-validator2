@@ -19,8 +19,8 @@ android {
         applicationId = "com.aiorigin.detector"
         minSdk = 28
         targetSdk = 35
-        versionCode = 23
-        versionName = "0.23.0"
+        versionCode = 24
+        versionName = "0.24.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The phone is arm64; x86_64 is kept only so the CI emulator can run the model.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

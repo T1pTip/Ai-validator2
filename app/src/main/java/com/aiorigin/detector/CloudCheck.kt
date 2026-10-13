@@ -54,6 +54,38 @@ object CloudCheck {
         } finally { retriever.release() }
     }
 
+    /** Frame from the middle of a video, for the local description. */
+    fun middleFrame(context: Context, uri: Uri): Bitmap? {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            return retriever.getFrameAtTime(duration * 500, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        } finally { retriever.release() }
+    }
+
+    /** JPEG for Gemini: the image (or the middle video frame), long edge at most 1536 px. */
+    fun jpegForGemini(context: Context, uri: Uri, isVideo: Boolean): ByteArray {
+        val bitmap = (if (isVideo) middleFrame(context, uri) else {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= GEMINI_EDGE) sample *= 2
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+            }
+        }) ?: throw IllegalStateException("undecodable")
+        try {
+            val scale = GEMINI_EDGE.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val src = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true) else bitmap
+            try {
+                return ByteArrayOutputStream().use { out -> src.compress(Bitmap.CompressFormat.JPEG, 90, out); out.toByteArray() }
+            } finally { if (src !== bitmap) src.recycle() }
+        } finally { bitmap.recycle() }
+    }
+
+    private const val GEMINI_EDGE = 1536
+
     private fun jpeg(bitmap: Bitmap): ByteArray {
         val scale = MAX_EDGE.toFloat() / maxOf(bitmap.width, bitmap.height)
         val src = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true) else bitmap

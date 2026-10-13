@@ -25,7 +25,9 @@ data class ScanResult(
     /** On-device visual estimate; null when it could not run (see evidence). */
     val visual: LocalDetector.Score? = null,
     /** True when the headline comes from the visual estimate rather than from metadata. */
-    val visualHeadline: Boolean = false
+    val visualHeadline: Boolean = false,
+    /** Generator / tool names found in metadata, strongest first; used to pick the prompt dialect. */
+    val generatorHints: List<String> = emptyList()
 )
 
 /**
@@ -154,7 +156,10 @@ object Scanner {
             isVideo = isVideo,
             description = MetadataAssessor.description(metadata)?.takeIf { it != fields.positive },
             visual = visual,
-            visualHeadline = visualHeadline
+            visualHeadline = visualHeadline,
+            generatorHints = listOfNotNull(
+                assessment.c2paGenerator, assessment.tool, fields.settings["Model"], assessment.software
+            ).filter { it.isNotBlank() }
         )
     }
 
