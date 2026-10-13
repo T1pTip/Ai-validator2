@@ -33,7 +33,7 @@ sealed class CloudState {
     data object Idle : CloudState()
     data object Running : CloudState()
     data class Done(val outcome: CloudCheck.Outcome) : CloudState()
-    data class Failed(val message: String) : CloudState()
+    data class Failed(val message: String, val keysProblem: Boolean = false) : CloudState()
 }
 
 /** Survives rotation and configuration changes, so a running scan and its result are kept. */
@@ -163,7 +163,7 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         val result = snapshot.result ?: return
         val credentials = secrets.load()
         if (credentials == null) {
-            _state.update { it.copy(cloud = CloudState.Failed(app.getString(R.string.cloud_no_keys))) }
+            _state.update { it.copy(cloud = CloudState.Failed(app.getString(R.string.cloud_no_keys), keysProblem = true)) }
             return
         }
         val current = generation
@@ -190,7 +190,8 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: SightengineClient.ApiException) {
                 CloudState.Failed(
                     when (e.kind) {
-                        SightengineClient.Kind.AUTH -> app.getString(R.string.cloud_err_auth)
+                        SightengineClient.Kind.AUTH -> return@launch finishCloud(current,
+                            CloudState.Failed(app.getString(R.string.cloud_err_auth), keysProblem = true))
                         SightengineClient.Kind.QUOTA -> app.getString(R.string.cloud_err_quota)
                         SightengineClient.Kind.BAD_MEDIA -> app.getString(R.string.cloud_err_media, e.message ?: "")
                         SightengineClient.Kind.SERVER -> app.getString(R.string.cloud_err_server, e.message ?: "")
@@ -202,7 +203,11 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 CloudState.Failed(app.getString(R.string.cloud_err_server, e.javaClass.simpleName))
             }
-            if (current == generation) _state.update { it.copy(cloud = outcome) }
+            finishCloud(current, outcome)
         }
+    }
+
+    private fun finishCloud(current: Int, outcome: CloudState) {
+        if (current == generation) _state.update { it.copy(cloud = outcome) }
     }
 }

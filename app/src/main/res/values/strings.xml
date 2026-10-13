@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">גלאי מקור AI</string>
-    <string name="app_title">גלאי מקור AI</string>
-    <string name="subtitle">סריקה מקומית בטלפון · שליחה לענן רק באישור שלך</string>
-    <string name="device_line">%1$s · זיכרון פנוי %2$s מתוך %3$s GB · %4$d ליבות · חום: %5$s</string>
-    <string name="mode_line">מצב עיבוד מומלץ: %1$s</string>
-    <string name="mode_performance">ביצועים</string>
-    <string name="mode_balanced">מאוזן</string>
-    <string name="mode_conservative">חסכוני</string>
     <string name="choose">בחר תמונה או סרטון</string>
     <string name="scanning">סורק…</string>
     <string name="cancel">ביטול</string>
@@ -117,14 +110,14 @@
     <string name="cloud_generator">המחולל הסביר ביותר לפי Sightengine: %1$s (%2$d%%)</string>
     <string name="cloud_operations">יחידות שנוצלו בבדיקה: %1$d</string>
     <string name="cloud_no_keys">צריך להגדיר מפתחות Sightengine לפני הבדיקה בענן.</string>
-    <string name="cloud_err_auth">Sightengine דחה את המפתחות. בדוק את ה-API user וה-API secret בהגדרות.</string>
+    <string name="cloud_err_auth">Sightengine דחה את המפתחות. בדוק את ה-API user ואת ה-API secret.</string>
+    <string name="cloud_fix_keys">הזן מפתחות</string>
     <string name="cloud_err_quota">נגמרה המכסה החינמית של Sightengine (יומית או חודשית).</string>
     <string name="cloud_err_media">Sightengine לא הצליח לקרוא את הקובץ: %1$s</string>
     <string name="cloud_err_server">שגיאה מ-Sightengine: %1$s</string>
     <string name="cloud_err_network">אין חיבור ל-Sightengine: %1$s</string>
     <string name="cloud_err_prepare">לא ניתן היה להכין את הקובץ לשליחה: %1$s</string>
     <string name="cloud_note">גם שירות ענן יכול לטעות. התוצאה היא חוות דעת נוספת, לא הוכחה.</string>
-    <string name="settings">הגדרות ענן</string>
     <string name="settings_title">מפתחות Sightengine</string>
     <string name="settings_body">המפתחות נשמרים מוצפנים בטלפון בלבד (Android Keystore), ונשלחים רק ל-Sightengine כשאתה מאשר בדיקה.</string>
     <string name="settings_user">API user</string>

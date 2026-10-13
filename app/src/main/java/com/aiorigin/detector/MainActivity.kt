@@ -102,9 +102,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AppScreen(viewModel: ScanViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.state.collectAsState()
-    val profile = remember { DeviceProfiler.inspect(context) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.scan(uri)
     }
@@ -113,14 +111,6 @@ private fun AppScreen(viewModel: ScanViewModel) {
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            var showSettings by rememberSaveable { mutableStateOf(false) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.app_title), Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { showSettings = true }, modifier = Modifier.testTag("settings")) { Text(stringResource(R.string.settings)) }
-            }
-            if (showSettings) SettingsDialog(viewModel) { showSettings = false }
-            Text(stringResource(R.string.subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            DeviceCard(profile)
             Button(
                 onClick = { picker.launch(arrayOf("image/*", "video/*")) },
                 enabled = !state.busy,
@@ -167,32 +157,6 @@ private fun UrlInput(enabled: Boolean, onSubmit: (String) -> Unit) {
             enabled = enabled && text.isNotBlank(),
             modifier = Modifier.heightIn(min = 56.dp)
         ) { Text(stringResource(R.string.url_check)) }
-    }
-}
-
-@Composable
-private fun DeviceCard(profile: DeviceProfile) {
-    val mode = stringResource(
-        when (profile.recommendedMode) {
-            "Performance" -> R.string.mode_performance
-            "Conservative" -> R.string.mode_conservative
-            else -> R.string.mode_balanced
-        }
-    )
-    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(
-                    R.string.device_line, profile.device,
-                    String.format(Locale.US, "%.1f", profile.availableRamGb),
-                    String.format(Locale.US, "%.1f", profile.physicalRamGb),
-                    profile.cpuCores, profile.thermalStatus
-                ),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(stringResource(R.string.mode_line, mode), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 
@@ -319,7 +283,12 @@ private fun CloudSection(r: ScanResult, state: ScanUiState, viewModel: ScanViewM
                 Text(stringResource(R.string.cloud_note), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is CloudState.Failed -> Text(cloud.message, Modifier.testTag("cloud_error"), color = MaterialTheme.colorScheme.error)
+            is CloudState.Failed -> {
+                Text(cloud.message, Modifier.testTag("cloud_error"), color = MaterialTheme.colorScheme.error)
+                if (cloud.keysProblem) {
+                    TextButton(onClick = { needKeys = true }) { Text(stringResource(R.string.cloud_fix_keys)) }
+                }
+            }
             CloudState.Idle -> {}
         }
         if (state.cloud != CloudState.Running && state.media != null) {
@@ -345,11 +314,11 @@ private fun CloudSection(r: ScanResult, state: ScanUiState, viewModel: ScanViewM
             dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel_dialog)) } }
         )
     }
-    if (needKeys) SettingsDialog(viewModel, message = stringResource(R.string.cloud_no_keys)) { needKeys = false }
+    if (needKeys) SettingsDialog(viewModel, message = stringResource(R.string.cloud_no_keys), onSaved = { confirm = true }) { needKeys = false }
 }
 
 @Composable
-private fun SettingsDialog(viewModel: ScanViewModel, message: String? = null, onClose: () -> Unit) {
+private fun SettingsDialog(viewModel: ScanViewModel, message: String? = null, onSaved: () -> Unit = {}, onClose: () -> Unit) {
     var user by remember { mutableStateOf("") }
     var secret by remember { mutableStateOf("") }
     val hint = remember { viewModel.cloudKeyHint() }
@@ -374,7 +343,7 @@ private fun SettingsDialog(viewModel: ScanViewModel, message: String? = null, on
         },
         confirmButton = {
             TextButton(
-                onClick = { viewModel.saveCloudKeys(user, secret); onClose() },
+                onClick = { viewModel.saveCloudKeys(user, secret); onClose(); onSaved() },
                 enabled = user.isNotBlank() && secret.isNotBlank(),
                 modifier = Modifier.testTag("key_save")
             ) { Text(stringResource(R.string.settings_save)) }

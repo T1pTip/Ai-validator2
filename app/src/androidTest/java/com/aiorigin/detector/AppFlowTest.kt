@@ -87,19 +87,36 @@ class AppFlowTest {
         }
     }
 
-    @Test fun keysEnteredInSettingsAreStoredEncrypted() {
+    @Test fun firstCloudCheckAsksForKeysThenForConsent() {
         SecretStore(ctx).clear()
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            setClassName(ctx, MainActivity::class.java.name)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        ActivityScenario.launch<MainActivity>(intent).use {
-            compose.onNodeWithTag("settings").performClick()
+        server.enqueue(MockResponse().setBody("""{"status":"success","type":{"ai_generated":0.97}}"""))
+        share("street.png").use {
+            compose.waitUntil(120_000) { compose.onAllNodes(hasTestTag("verdict")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("cloud_button").performScrollTo().performClick()
             compose.onNodeWithTag("key_user").performTextInput("typed-user-1234")
             compose.onNodeWithTag("key_secret").performTextInput("typed-secret")
             compose.onNodeWithTag("key_save").performClick()
-            compose.waitForIdle()
             assertEquals(SightengineClient.Credentials("typed-user-1234", "typed-secret"), SecretStore(ctx).load())
+            // Saving the keys leads to the consent dialog; still nothing has been sent.
+            assertEquals(0, server.requestCount)
+            compose.onNodeWithTag("cloud_confirm").performClick()
+            compose.waitUntil(60_000) { compose.onAllNodes(hasTestTag("cloud_result")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(ctx.getString(R.string.cloud_result, 97)).assertExists()
+            assertTrue(server.takeRequest().body.readUtf8().contains("typed-secret"))
+        }
+    }
+
+    @Test fun rejectedKeysOfferToEnterThemAgain() {
+        server.enqueue(MockResponse().setResponseCode(401).setBody(
+            """{"status":"failure","error":{"type":"credentials_error","message":"Incorrect api_user or api_secret"}}"""))
+        share("street.png").use {
+            compose.waitUntil(120_000) { compose.onAllNodes(hasTestTag("verdict")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("cloud_button").performScrollTo().performClick()
+            compose.onNodeWithTag("cloud_confirm").performClick()
+            compose.waitUntil(60_000) { compose.onAllNodes(hasTestTag("cloud_error")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(ctx.getString(R.string.cloud_err_auth)).assertExists()
+            compose.onNodeWithText(ctx.getString(R.string.cloud_fix_keys)).performScrollTo().performClick()
+            compose.onNodeWithTag("key_user").assertExists()
         }
     }
 }
